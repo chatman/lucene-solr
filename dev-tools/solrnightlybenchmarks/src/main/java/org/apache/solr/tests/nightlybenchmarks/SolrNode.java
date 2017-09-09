@@ -166,12 +166,10 @@ public class SolrNode {
 		String tarballLocation = Util.DOWNLOAD_DIR + "solr-" + commitId + ".zip";
 
 		if (!new File(tarballLocation).exists()) {
-			if (!new File(packageFilename).exists()) {
-				logger.debug("There were new changes, need to rebuild ...");
-				Util.execute("ant ivy-bootstrap", gitDirectoryPath);
-				// Util.execute("ant compile", gitDirectoryPath);
-				Util.execute("ant package", gitDirectoryPath + File.separator + "solr");
-			}
+			logger.debug("There were new changes, need to rebuild ...");
+			Util.execute("ant ivy-bootstrap", gitDirectoryPath);
+			// Util.execute("ant compile", gitDirectoryPath);
+			Util.execute("ant package", gitDirectoryPath + File.separator + "solr");
 			
 			if (new File(packageFilename).exists()) {
 				
