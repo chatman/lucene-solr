@@ -1865,7 +1865,7 @@ public class Util {
 	
 	public static String getDateString(int epoch) {
 		Date date = new Date(1000L * epoch);
-		SimpleDateFormat format = new SimpleDateFormat("dd/MM/yyyy HH:mm:ss");
+		SimpleDateFormat format = new SimpleDateFormat("MM/dd/yyyy HH:mm:ss");
 		format.setTimeZone(TimeZone.getTimeZone("Etc/UTC"));
 		String dateStr = format.format(date);
 		return dateStr;
