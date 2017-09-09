@@ -27,15 +27,16 @@ public class BenchmarksMain {
 
 		String commitId = "e782082e711286a4c1a6ca101a9fa11bafab7b0d";
 
+		if (args.length>0 && args[0].length()==40) {
+			commitId = args[0];
+		}
+		
 		SolrCloud solrCloud = new SolrCloud(3, commitId);
 
 		try {
 			solrCloud.init();
 
-			Date date = new Date(1000L * solrCloud.nodes.get(0).commitTime);
-			SimpleDateFormat format = new SimpleDateFormat("dd/MM/yyyy HH:mm:ss");
-			format.setTimeZone(TimeZone.getTimeZone("Etc/UTC"));
-			String commitDate = format.format(date);
+			String commitDate = Util.getDateString(solrCloud.nodes.get(0).commitTime);
 
 			String jsonConfig = FileUtils.readFileToString(new File("config.json"),"UTF-8");
 			JSONParser parser = new JSONParser();

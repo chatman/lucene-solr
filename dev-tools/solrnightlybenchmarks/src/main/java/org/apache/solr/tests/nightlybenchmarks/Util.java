@@ -49,6 +49,7 @@ import java.util.Map;
 import java.util.Properties;
 import java.util.Random;
 import java.util.Set;
+import java.util.TimeZone;
 import java.util.TreeSet;
 import java.util.UUID;
 import java.util.concurrent.ThreadLocalRandom;
@@ -1862,6 +1863,14 @@ public class Util {
 		return configurations;
 	}
 	
+	public static String getDateString(int epoch) {
+		Date date = new Date(1000L * epoch);
+		SimpleDateFormat format = new SimpleDateFormat("dd/MM/yyyy HH:mm:ss");
+		format.setTimeZone(TimeZone.getTimeZone("Etc/UTC"));
+		String dateStr = format.format(date);
+		return dateStr;
+	}
+
 	// TODO: Clean this up. Maybe convert to JSON, add the metrics, and convert back to CSV.
 	public static void outputMetrics(String filename, Map<String, String> timings) throws Exception {
 		File outputFile = new File(filename);
