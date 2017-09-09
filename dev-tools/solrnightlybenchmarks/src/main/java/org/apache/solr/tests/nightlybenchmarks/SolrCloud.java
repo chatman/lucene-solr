@@ -18,13 +18,10 @@
 package org.apache.solr.tests.nightlybenchmarks;
 
 import java.io.IOException;
-import java.util.LinkedList;
+import java.util.ArrayList;
 import java.util.List;
-import java.util.Map;
-import java.util.UUID;
 
 import org.apache.log4j.Logger;
-import org.eclipse.jgit.api.errors.GitAPIException;
 
 /**
  * This class provides a blueprint for SolrCloud
@@ -35,93 +32,34 @@ public class SolrCloud {
 
 	public final static Logger logger = Logger.getLogger(SolrCloud.class);
 
-	public int solrNodes;
-	public int shards;
-	public int replicas;
-	public String port;
-	public Zookeeper zookeeperNode;
-	public String zookeeperPort;
-	public String zookeeperIp;
-	public String commitId;
-	public String collectionName;
-	public String configName;
-	public SolrNode masterNode;
-	public List<SolrNode> nodes;
-	public String url;
-	public String host;
-	public boolean createADefaultCollection;
-	public Map<String, String> returnMapCreateCollection;
-	public BenchmarkConfiguration configuration;
+	final int numNodes;
+	Zookeeper zookeeper;
+	final String commitId;
+	List<SolrNode> nodes = new ArrayList<>();
 
-	/**
-	 * Constructor.
-	 * 
-	 * @param solrNodes
-	 * @param shards
-	 * @param replicas
-	 * @param commitId
-	 * @param configName
-	 * @param creatADefaultCollection
-	 * @throws Exception 
-	 */
-	public SolrCloud(BenchmarkConfiguration configuration, String configName, boolean creatADefaultCollection, String host) throws Exception {
-		super();
-		this.host = host;
-		this.solrNodes = configuration.nodes;
-		this.shards = configuration.shards;
-		this.replicas = configuration.replicas;
-		this.commitId = configuration.commitID;
-		this.configName = configName;
-		this.collectionName = "Collection_" + UUID.randomUUID();
-		this.createADefaultCollection = creatADefaultCollection;
-		nodes = new LinkedList<SolrNode>();
-		this.init();
-		this.configuration = configuration;
+	public SolrCloud(int numNodes, String commitId) throws Exception {
+		this.numNodes = numNodes;
+		this.commitId = commitId;
 	}
 
 	/**
 	 * A method used for getting ready to set up the Solr Cloud.
 	 * @throws Exception 
 	 */
-	private void init() throws Exception {
-
-		try {
-
-			zookeeperNode = new Zookeeper();
-			int initValue = zookeeperNode.doAction(ZookeeperAction.ZOOKEEPER_START);
-			if (initValue == 0) {
-				this.zookeeperIp = zookeeperNode.getZookeeperIp();
-				this.zookeeperPort = zookeeperNode.getZookeeperPort();
-			} else {
+	public void init() throws Exception {
+			zookeeper = new Zookeeper();
+			int initValue = zookeeper.doAction(ZookeeperAction.ZOOKEEPER_START);
+			if (initValue != 0) {
 				logger.error("Failed to start Zookeeper!");
 				throw new RuntimeException("Failed to start Zookeeper!");
 			}
 
-			for (int i = 1; i <= solrNodes; i++) {
+			for (int i = 1; i <= numNodes; i++) {
 
-				SolrNode node = new SolrNode(commitId, this.zookeeperIp, this.zookeeperPort, true);
+				SolrNode node = new SolrNode(commitId, zookeeper, true);
 				node.doAction(SolrNodeAction.NODE_START);
 				nodes.add(node);
 			}
-
-			if (this.createADefaultCollection) {
-				returnMapCreateCollection = nodes.get(0).createCollection(configuration, this.collectionName, this.configName,
-						this.shards, this.replicas);
-			}
-
-			this.port = nodes.get(0).port;
-			this.url = "http://" + this.host + ":" + this.port + "/solr/" + this.collectionName;
-
-		} catch (IOException e) {
-			logger.error(e.getMessage());
-			throw new IOException(e.getMessage());
-		} catch (GitAPIException e) {
-			logger.error(e.getMessage());
-			throw new Exception(e.getMessage());
-		} catch (InterruptedException e) {
-			logger.error(e.getMessage());
-			throw new InterruptedException(e.getMessage());
-		}
 	}
 
 	/**
@@ -135,7 +73,7 @@ public class SolrCloud {
 	 */
 	public void createCollection(String collectionName, String configName, int shards, int replicas) throws Exception {
 		try {
-			nodes.get(0).createCollection(configuration, collectionName, configName, shards, replicas);
+			nodes.get(0).createCollection(collectionName, configName, shards, replicas);
 		} catch (IOException | InterruptedException e) {
 			logger.error(e.getMessage());
 			throw new Exception(e.getMessage());
@@ -158,22 +96,13 @@ public class SolrCloud {
 	}
 
 	/**
-	 * A method used for getting the URL for the solr cloud.
-	 * 
-	 * @return String
-	 */
-	public String getuRL() {
-		return "http://" + this.host + ":" + this.port + "/solr/";
-	}
-
-	/**
 	 * A method used to get the zookeeper url for communication with the solr
 	 * cloud.
 	 * 
 	 * @return String
 	 */
 	public String getZookeeperUrl() {
-		return this.zookeeperIp + ":" + this.zookeeperPort;
+		return zookeeper.getZookeeperIp() + ":" + zookeeper.getZookeeperPort();
 	}
 
 	/**
@@ -185,7 +114,14 @@ public class SolrCloud {
 			node.doAction(SolrNodeAction.NODE_STOP);
 			node.cleanup();
 		}
-		zookeeperNode.doAction(ZookeeperAction.ZOOKEEPER_STOP);
-		zookeeperNode.doAction(ZookeeperAction.ZOOKEEPER_CLEAN);
+		zookeeper.doAction(ZookeeperAction.ZOOKEEPER_STOP);
+		zookeeper.doAction(ZookeeperAction.ZOOKEEPER_CLEAN);
+	}
+	
+	public static void main(String[] args) throws Exception {
+		SolrCloud cloud = new SolrCloud(3, "e782082e711286a4c1a6ca101a9fa11bafab7b0d");
+		cloud.init();
+		cloud.createCollection("mycollection", null, 2, 2);
+		cloud.shutdown();
 	}
 }

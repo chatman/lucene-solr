@@ -25,6 +25,7 @@ import java.io.FileInputStream;
 import java.io.FileNotFoundException;
 import java.io.FileOutputStream;
 import java.io.FileReader;
+import java.io.FileWriter;
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.InputStreamReader;
@@ -36,10 +37,15 @@ import java.net.URL;
 import java.security.MessageDigest;
 import java.security.NoSuchAlgorithmException;
 import java.text.SimpleDateFormat;
+import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.Date;
 import java.util.Iterator;
+import java.util.LinkedHashMap;
+import java.util.LinkedHashSet;
 import java.util.LinkedList;
 import java.util.List;
+import java.util.Map;
 import java.util.Properties;
 import java.util.Random;
 import java.util.Set;
@@ -74,6 +80,7 @@ import com.sun.jersey.api.client.Client;
 import com.sun.jersey.api.client.ClientResponse;
 import com.sun.jersey.api.client.WebResource;
 
+import au.com.bytecode.opencsv.CSVReader;
 import net.lingala.zip4j.core.ZipFile;
 import net.lingala.zip4j.exception.ZipException;
 
@@ -1311,7 +1318,7 @@ public class Util {
 					Util.COMMIT_ID = Util.getLatestCommitID(Util.LUCENE_SOLR_REPOSITORY_URL);
 					logger.debug("The latest commit ID is: " + Util.COMMIT_ID);
 	
-					Benchmarks.runBenchmarks(Util.COMMIT_ID);
+					//Benchmarks.runBenchmarks(Util.COMMIT_ID);
 
 					//TestPlans.execute();
 					//BenchmarkAppConnector.publishDataForWebApp();
@@ -1324,7 +1331,7 @@ public class Util {
 					Util.COMMIT_ID = argsList.get(argsList.indexOf("--commit-id") + 1);
 					logger.debug(" Executing benchmarks with commit: " + Util.COMMIT_ID);
 					
-					Benchmarks.runBenchmarks(Util.COMMIT_ID);
+					//Benchmarks.runBenchmarks(Util.COMMIT_ID);
 
 					//TestPlans.execute();
 					//BenchmarkAppConnector.publishDataForWebApp();
@@ -1853,5 +1860,56 @@ public class Util {
         }		
 		
 		return configurations;
+	}
+	
+	// TODO: Clean this up. Maybe convert to JSON, add the metrics, and convert back to CSV.
+	public static void outputMetrics(String filename, Map<String, String> timings) throws Exception {
+		File outputFile = new File(filename);
+		
+		String header[] = new String[0];
+		List<Map<String, String>> lines = new ArrayList<>();
+
+		if (outputFile.exists()) {
+			CSVReader reader = new CSVReader(new FileReader(outputFile));
+
+			String tmp[] = reader.readNext();
+			header = new String[tmp.length];
+			for (int i=0; i<header.length; i++) {
+				header[i] = tmp[i].trim();
+			}
+
+			String line[];
+			while((line=reader.readNext()) != null) {
+				if (line.length != header.length) {
+					continue;
+				}
+				Map<String, String> mappedLine = new LinkedHashMap<>();
+
+				for (int i=0; i<header.length; i++) {
+					mappedLine.put(header[i], line[i]);
+				}
+				lines.add(mappedLine);
+			}
+			reader.close();
+		}
+		
+		LinkedHashSet<String> newHeaders = new LinkedHashSet<>(Arrays.asList(header));
+		newHeaders.addAll(timings.keySet());
+		
+		lines.add(timings);
+		FileWriter out = new FileWriter(filename);
+		out.write(Arrays.toString(newHeaders.toArray()).replaceAll("\\[", "").replaceAll("\\]", "") + "\n");
+		for (Map<String, String> oldLine: lines) {
+			for (int i=0; i<newHeaders.size(); i++) {
+				String col = oldLine.get(newHeaders.toArray()[i]);
+				out.write(col == null? " ": col);
+				if (i==newHeaders.size()-1) {
+					out.write("\n");
+				} else {
+					out.write(",");
+				}
+			}
+		}
+		out.close();				
 	}
 }

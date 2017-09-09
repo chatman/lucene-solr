@@ -54,9 +54,8 @@ public class SolrNode {
 	public String baseDirectory;
 	public String port;
 	private String nodeDirectory;
-	private String commitId;
-	private String zooKeeperIp;
-	private String zooKeeperPort;
+	private final String commitId;
+	private final Zookeeper zookeeper;
 	private String gitDirectoryPath = Util.DOWNLOAD_DIR + "git-repository-";
 
 	/**
@@ -67,12 +66,11 @@ public class SolrNode {
 	 * @param isRunningInCloudMode
 	 * @throws Exception 
 	 */
-	public SolrNode(String commitId, String zooKeeperIp, String zooKeeperPort, boolean isRunningInCloudMode)
+	public SolrNode(String commitId, Zookeeper zookeeper, boolean isRunningInCloudMode)
 			throws Exception {
 		super();
 		this.commitId = commitId;
-		this.zooKeeperIp = zooKeeperIp;
-		this.zooKeeperPort = zooKeeperPort;
+		this.zookeeper = zookeeper;
 		this.isRunningInCloudMode = isRunningInCloudMode;
 		//this.gitDirectoryPath = Util.DOWNLOAD_DIR + "git-repository-" + commitId;
 		this.gitDirectoryPath = Util.DOWNLOAD_DIR + "git-repository";
@@ -213,7 +211,7 @@ public class SolrNode {
 
 			if (isRunningInCloudMode) {
 				returnValue = Util.execute(nodeDirectory + "solr start -force " + "-p " + port + " -m 5g " + " -z "
-						+ zooKeeperIp + ":" + zooKeeperPort, nodeDirectory);
+						+ zookeeper.getZookeeperIp() + ":" + zookeeper.getZookeeperPort(), nodeDirectory);
 			} else {
 				returnValue = Util.execute(nodeDirectory + "solr start -force " + "-p " + port + " -m 5g ",
 						nodeDirectory);
@@ -223,7 +221,7 @@ public class SolrNode {
 
 			if (isRunningInCloudMode) {
 				returnValue = Util.execute(
-						nodeDirectory + "solr stop -p " + port + " -z " + zooKeeperIp + ":" + zooKeeperPort + " -force",
+						nodeDirectory + "solr stop -p " + port + " -z " + zookeeper.getZookeeperIp() + ":" + zookeeper.getZookeeperPort() + " -force",
 						nodeDirectory);
 			} else {
 				returnValue = Util.execute(nodeDirectory + "solr stop -p " + port + " -force", nodeDirectory);
@@ -290,11 +288,11 @@ public class SolrNode {
 	 * @throws Exception 
 	 */
 	@SuppressWarnings("deprecation")
-	public Map<String, String> createCollection(BenchmarkConfiguration configuration, String collectionName, String configName, int shards,
+	public Map<String, String> createCollection(String collectionName, String configName, int shards,
 			int replicas) throws Exception {
 
-		Thread thread = new Thread(new MetricCollector(configuration, this.port));
-		thread.start();
+		/*Thread thread = new Thread(new MetricCollector(configuration, this.port));
+		thread.start();*/
 
 		this.collectionName = collectionName;
 		logger.info("Creating collection ... ");
@@ -316,7 +314,7 @@ public class SolrNode {
 		}
 
 		logger.info("Time for creating the collection is: " + (end - start) + " millisecond(s)");
-		thread.stop();
+		//thread.stop();
 
 		Thread.sleep(5000);
 		
