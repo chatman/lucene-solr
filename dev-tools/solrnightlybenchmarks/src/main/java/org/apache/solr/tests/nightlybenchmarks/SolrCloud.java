@@ -47,19 +47,19 @@ public class SolrCloud {
 	 * @throws Exception 
 	 */
 	public void init() throws Exception {
-			zookeeper = new Zookeeper();
-			int initValue = zookeeper.doAction(ZookeeperAction.ZOOKEEPER_START);
-			if (initValue != 0) {
-				logger.error("Failed to start Zookeeper!");
-				throw new RuntimeException("Failed to start Zookeeper!");
-			}
+		zookeeper = new Zookeeper();
+		int initValue = zookeeper.doAction(ZookeeperAction.ZOOKEEPER_START);
+		if (initValue != 0) {
+			logger.error("Failed to start Zookeeper!");
+			throw new RuntimeException("Failed to start Zookeeper!");
+		}
 
-			for (int i = 1; i <= numNodes; i++) {
+		for (int i = 1; i <= numNodes; i++) {
 
-				SolrNode node = new SolrNode(commitId, zookeeper, true);
-				node.doAction(SolrNodeAction.NODE_START);
-				nodes.add(node);
-			}
+			SolrNode node = new SolrNode(commitId, zookeeper, true);
+			node.doAction(SolrNodeAction.NODE_START);
+			nodes.add(node);
+		}
 	}
 
 	/**
@@ -117,7 +117,7 @@ public class SolrCloud {
 		zookeeper.doAction(ZookeeperAction.ZOOKEEPER_STOP);
 		zookeeper.doAction(ZookeeperAction.ZOOKEEPER_CLEAN);
 	}
-	
+
 	public static void main(String[] args) throws Exception {
 		SolrCloud cloud = new SolrCloud(3, "e782082e711286a4c1a6ca101a9fa11bafab7b0d");
 		cloud.init();

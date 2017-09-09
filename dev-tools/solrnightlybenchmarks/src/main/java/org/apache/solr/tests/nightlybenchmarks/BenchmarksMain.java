@@ -4,9 +4,12 @@ import java.io.BufferedReader;
 import java.io.File;
 import java.io.FileReader;
 import java.io.IOException;
+import java.text.SimpleDateFormat;
+import java.util.Date;
 import java.util.Iterator;
 import java.util.LinkedHashMap;
 import java.util.Map;
+import java.util.TimeZone;
 
 import org.apache.commons.io.FileUtils;
 import org.apache.solr.client.solrj.SolrServerException;
@@ -23,14 +26,16 @@ public class BenchmarksMain {
 	public static void main(String[] args) throws Exception {
 
 		String commitId = "e782082e711286a4c1a6ca101a9fa11bafab7b0d";
-		String date = "2017/07/31 20:03:55";
 
 		SolrCloud solrCloud = new SolrCloud(3, commitId);
 
 		try {
 			solrCloud.init();
 
-			//StandaloneSolr standalone = new new StandaloneSolr(); // port
+			Date date = new Date(1000L * solrCloud.nodes.get(0).commitTime);
+			SimpleDateFormat format = new SimpleDateFormat("dd/MM/yyyy HH:mm:ss");
+			format.setTimeZone(TimeZone.getTimeZone("Etc/UTC"));
+			String commitDate = format.format(date);
 
 			String jsonConfig = FileUtils.readFileToString(new File("config.json"),"UTF-8");
 			JSONParser parser = new JSONParser();
@@ -62,7 +67,7 @@ public class BenchmarksMain {
 					String outputCSV = collectionName+".csv";
 
 					Map<String, String> timings = new LinkedHashMap<>();
-					timings.put("Date",  date);
+					timings.put("Date",  commitDate);
 					timings.put("Test_ID", commitId);
 					timings.put("CommitID",  commitId);
 

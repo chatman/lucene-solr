@@ -33,6 +33,7 @@ import org.apache.solr.tests.nightlybenchmarks.BenchmarkAppConnector.FileType;
 import org.eclipse.jgit.api.Git;
 import org.eclipse.jgit.api.PullCommand;
 import org.eclipse.jgit.api.errors.GitAPIException;
+import org.eclipse.jgit.revwalk.RevCommit;
 
 enum SolrNodeAction {
 	NODE_START, NODE_STOP
@@ -55,6 +56,7 @@ public class SolrNode {
 	public String port;
 	private String nodeDirectory;
 	private final String commitId;
+	public int commitTime;
 	private final Zookeeper zookeeper;
 	private String gitDirectoryPath = Util.DOWNLOAD_DIR + "git-repository-";
 
@@ -150,7 +152,14 @@ public class SolrNode {
 			repository.checkout().setName(commitId).call();
 			BenchmarkAppConnector.deleteFolder(FileType.IS_CLONING_FILE);
 		}
-		
+
+		for (RevCommit revCommit: repository.log().call()) {
+			if (revCommit.getId().name().equals(commitId)) {
+				this.commitTime = revCommit.getCommitTime();
+				break;
+			}
+		}
+
 		String packageFilename = gitDirectoryPath + "/solr/package/";
 		Util.SOLR_PACKAGE_DIR = packageFilename;
 		Util.SOLR_PACKAGE_DIR_LOCATION = gitDirectoryPath;
