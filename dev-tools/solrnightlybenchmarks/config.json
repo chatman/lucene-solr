@@ -7,6 +7,7 @@
       "dataset-file": "small-data/en-wiki-data-2G-modified.csv",
       "setups": [
         {
+          "setup-name": "cloud_2x2",
           "collection": "cloud_2x2",
           "replicationFactor": 2,
           "shards": 2,
@@ -14,6 +15,7 @@
           "max-threads": 3
         },
         {
+	  "setup-name": "cloud_1x1",
           "collection": "cloud_1x1",
           "replicationFactor": 1,
           "shards": 1,
