@@ -60,12 +60,13 @@ public class BenchmarksMain {
 				while (setupsIterator.hasNext()) {
 					JSONObject setup = (JSONObject) setupsIterator.next();
 					String collectionName = (String) setup.get("collection");
+					String setupName = (String) setup.get("setup-name");
 					int replicationFactor = (int)(long) setup.get("replicationFactor");
 					int shards = (int)(long) setup.get("shards");
 					int minThreads = (int)(long) setup.get("min-threads");
 					int maxThreads = (int)(long) setup.get("max-threads");
 
-					String outputCSV = collectionName+".csv";
+					String outputCSV = "./src/main/webapp/data/" + setupName+".csv";
 
 					Map<String, String> timings = new LinkedHashMap<>();
 					timings.put("Date",  commitDate);
@@ -108,6 +109,8 @@ public class BenchmarksMain {
 			solrCloud.shutdown();
 			//standalone.close();
 		}
+
+		FileUtils.copyFile(new File("config.json"), new File("src/main/webapp/data/config.json"));
 	}
 
 	static void index(SolrCloud solrCloud, String collectionName, int threads, String datasetFile) throws IOException, SolrServerException {
