@@ -1,0 +1,40 @@
+{
+  "index-benchmarks": [
+    {
+      "name": "CLOUD_INDEXING",
+      "description": "Wikipedia dataset on SolrCloud",
+      "replication-type": "cloud",
+      "dataset-file": "small-data/en-wiki-data-2G-modified.csv",
+      "setups": [
+        {
+          "setup-name": "cloud_2x2",
+          "collection": "cloud_2x2",
+          "replicationFactor": 2,
+          "shards": 2,
+          "min-threads": 1,
+          "max-threads": 3
+        },
+        {
+	  "setup-name": "cloud_1x1",
+          "collection": "cloud_1x1",
+          "replicationFactor": 1,
+          "shards": 1,
+          "min-threads": 1,
+          "max-threads": 3
+        }
+      ]
+    }
+  ],
+  "query-benchmarks": [
+    {
+      "name": "TERM_NUMERIC_QUERY_CLOUD_2T",
+      "description": "some shit describing the benchmark",
+      "replication-type": "cloud or standalone",
+      "collection/core": "<name of the collection/core, that must've already been created during the indexing phase>",
+      "query-file": "small-data/queryFile",
+      "client-type": "CUSC or CSC or HSC etc.",
+      "min-threads": 2,
+      "max-threads": 6
+    } 
+  ]
+}
