@@ -31,10 +31,10 @@
       "description": "some shit describing the benchmark",
       "replication-type": "cloud or standalone",
       "collection/core": "<name of the collection/core, that must've already been created during the indexing phase>",
-      "query-file": "name of file containing all the queries for this benchmark",
+      "query-file": "small-data/queryFile",
       "client-type": "CUSC or CSC or HSC etc.",
-      "min-threads": "1",
-      "max-threads": "8"
+      "min-threads": 2,
+      "max-threads": 7
     } 
   ]
 }
