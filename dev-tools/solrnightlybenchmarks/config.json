@@ -34,7 +34,7 @@
       "query-file": "small-data/queryFile",
       "client-type": "CUSC or CSC or HSC etc.",
       "min-threads": 2,
-      "max-threads": 6
+      "max-threads": 7
     } 
   ]
 }
