@@ -980,6 +980,45 @@
 				   '   </div>';
 		}
 	}
+	
+
+	// Create the placeholders for the graphs
+	for (i=0; i<config['query-benchmarks'].length; i++) {
+		benchmark = config['query-benchmarks'][i];
+		
+			document.getElementById("graphContainer").innerHTML += '<div class="panel panel-success" style="width:100%">' +
+				   '<div class="panel-heading">' 
+				   + benchmark['description']+' ['+benchmark['name']+'] (QPS)' +
+				   '      <a href="IndexingThroughputBenchmarkCloudConcurrent_2N1S2R.html" class="pull-right">More Details</a>' +
+				   '     </div>' +
+				   '     <div class="panel-body">' +
+				   '            <div class="row">' +
+				   '              <div class="col-xs-9 cols-md-9 col-lg-9">' +
+				   '                  <div class="row">' +
+				   '                    <div class="col-xs-12 cols-md-12 col-lg-12">' +
+				   '                      <span style="transform:rotate(-90deg);' +
+				   '                        margin-top:170px;width:2%;float:left;">' +
+				   '                             Documents/Second' +
+				   '                      </span>  ' +
+				   '                  <div id="' + "graphDiv-" + benchmark['name'] + '" style="width:95%; height:300px;"></div> ' +
+				   '                    </div>' +
+				   '                   </div>' +
+				   '                  <div class="row">' +
+				   '                    <div class="col-xs-12 cols-md-12 col-lg-12" style="text-align:center;">' +
+				   '                    Date/Time' +
+				   '                    </div>' +
+				   '                     </div>                      ' +
+				   '              </div>' +
+				   '              <div class="col-xs-3 cols-md-3 col-lg-3">' +
+				   '              <div id="welcomeMessage6">Please hover on the graph and click on a specific point on the graph to get more details ...</div>           ' +
+				   '                <div id="' + "pointData-" + benchmark['name'] + '"></div>' +
+				   '                       </div>' +
+				   '            </div>  ' +
+				   '     </div>' +
+				   '   </div>';
+		
+	}
+	
 	// Create the graphs
 	for (i=0; i<config['index-benchmarks'].length; i++) {
 		benchmark = config['index-benchmarks'][i];
@@ -1032,6 +1071,58 @@
 		}
 	}
 	
+	
+	// Create the graphs
+	for (i=0; i<config['query-benchmarks'].length; i++) {
+		benchmark = config['query-benchmarks'][i];
+			
+			new Dygraph(document.getElementById("graphDiv-" + benchmark['name']), "data/"+benchmark['name']+".csv", {
+			//new Dygraph(document.getElementById("graphDiv-" + benchmark['name']), "data/query_benchmark.csv", {
+			//new Dygraph(document.getElementById("graphDiv-" + benchmark['name']), "data/cloud_2x2.csv", {
+				labelsDiv: document.getElementById("pointData-" + benchmark['name']), visibility: [false, false, true, true, true, true, true], colors: ['#6B8E23','#4B0082','#FF0000','#DA70D6','#CD853F'],
+
+				highlightCallback: function (e, x, pts, row) {
+					commitID = fileData_indexing_throughput_data_cloud_concurrent_2n1s2r[(row + 1)].split(",")[2].trim();
+					testID = fileData_indexing_throughput_data_cloud_concurrent_2n1s2r[(row + 1)].split(",")[1].trim();
+                      
+					$.ajax({
+						type: "GET",
+						url: "data/" + testID + "_" + commitID + "_COMMIT_INFORMATION_dump.csv",
+						dataType: "text",
+						success: function(data) {
+							document.getElementById("testCommitInformation").innerHTML = data;
+						}
+					});
+					document.getElementById("welcomeMessage6").innerHTML = "";
+				},
+				pointClickCallback: function(e, p) {
+					point = p.name;
+					$('#memProfile').modal();
+					document.getElementById('memProfileFileChangeListLink').setAttribute('href', "https://git-wip-us.apache.org/repos/asf?p=lucene-solr.git;h=" + commitID);
+
+					setTimeout(function () {
+						if (p.name.includes("Throughput (3 Threads)")) {
+							g243 = new Dygraph(document.getElementById("memProfileGraph"), "data/" + testID + "_" + commitID + "_MEM_ESTIMATION_CLOUD_INDEXING_THROUGHPUT_CONCURRENT_2N1S2R_3T_dump.csv", { visibility: [false, true], colors: ['#6B8E23','#4B0082','#FF0000','#DA70D6','#CD853F'], labelsDiv: document.getElementById('memProfileStats') });
+							g244 = new Dygraph(document.getElementById("cpuProfileGraph"), "data/" + testID + "_" + commitID + "_CPU_ESTIMATION_CLOUD_INDEXING_THROUGHPUT_CONCURRENT_2N1S2R_3T_dump.csv", { visibility: [false, true], colors: ['#6B8E23','#4B0082','#FF0000','#DA70D6','#CD853F'], labelsDiv: document.getElementById('cpuProfileStats') });
+							memFile = "data/" + testID + "_" + commitID + "_MEM_ESTIMATION_CLOUD_INDEXING_THROUGHPUT_CONCURRENT_2N1S2R_3T_dump.csv";
+                            cpuFile = "data/" + testID + "_" + commitID + "_CPU_ESTIMATION_CLOUD_INDEXING_THROUGHPUT_CONCURRENT_2N1S2R_3T_dump.csv";
+						} else if (p.name.includes("Throughput (2 Threads)")) {
+							g243 = new Dygraph(document.getElementById("memProfileGraph"), "data/" + testID + "_" + commitID + "_MEM_ESTIMATION_CLOUD_INDEXING_THROUGHPUT_CONCURRENT_2N1S2R_2T_dump.csv", { visibility: [false, true], colors: ['#6B8E23','#4B0082','#FF0000','#DA70D6','#CD853F'], labelsDiv: document.getElementById('memProfileStats') });
+							g244 = new Dygraph(document.getElementById("cpuProfileGraph"), "data/" + testID + "_" + commitID + "_CPU_ESTIMATION_CLOUD_INDEXING_THROUGHPUT_CONCURRENT_2N1S2R_2T_dump.csv", { visibility: [false, true], colors: ['#6B8E23','#4B0082','#FF0000','#DA70D6','#CD853F'], labelsDiv: document.getElementById('cpuProfileStats') });
+							memFile = "data/" + testID + "_" + commitID + "_ME	M_ESTIMATION_CLOUD_INDEXING_THROUGHPUT_CONCURRENT_2N1S2R_2T_dump.csv";
+                            cpuFile = "data/" + testID + "_" + commitID + "_CPU_ESTIMATION_CLOUD_INDEXING_THROUGHPUT_CONCURRENT_2N1S2R_2T_dump.csv";
+						} else if (p.name.includes("Throughput (1 Threads)")) {
+							g243 = new Dygraph(document.getElementById("memProfileGraph"), "data/" + testID + "_" + commitID + "_MEM_ESTIMATION_CLOUD_INDEXING_THROUGHPUT_CONCURRENT_2N1S2R_1T_dump.csv", { visibility: [false, true], colors: ['#6B8E23','#4B0082','#FF0000','#DA70D6','#CD853F'], labelsDiv: document.getElementById('memProfileStats') });
+							g244 = new Dygraph(document.getElementById("cpuProfileGraph"), "data/" + testID + "_" + commitID + "_CPU_ESTIMATION_CLOUD_INDEXING_THROUGHPUT_CONCURRENT_2N1S2R_1T_dump.csv", { visibility: [false, true], colors: ['#6B8E23','#4B0082','#FF0000','#DA70D6','#CD853F'], labelsDiv: document.getElementById('cpuProfileStats') });
+							memFile = "data/" + testID + "_" + commitID + "_MEM_ESTIMATION_CLOUD_INDEXING_THROUGHPUT_CONCURRENT_2N1S2R_1T_dump.csv";
+							cpuFile = "data/" + testID + "_" + commitID + "_CPU_ESTIMATION_CLOUD_INDEXING_THROUGHPUT_CONCURRENT_2N1S2R_1T_dump.csv";
+						}
+					}, 250);
+				}
+			});
+			
+		
+	}
 	
     $(document).ready(function () {
 
