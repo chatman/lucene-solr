@@ -1,7 +1,7 @@
 cd ./SolrNightlyBenchmarksWorkDirectory/Download/git-repository
 
 
-for i in {0..60}
+for i in {0..365}
 do
 	mydate=`date '+%d %b %Y' --date="$i days ago"`
 	#echo $mydate

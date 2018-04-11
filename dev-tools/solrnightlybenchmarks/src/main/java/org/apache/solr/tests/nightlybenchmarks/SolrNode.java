@@ -217,7 +217,7 @@ public class SolrNode {
 		if (action == SolrNodeAction.NODE_START) {
 
 			if (isRunningInCloudMode) {
-				returnValue = Util.execute(nodeDirectory + "solr start -force " + "-p " + port + " -m 5g " + " -z "
+				returnValue = Util.execute(nodeDirectory + "solr start -force -Dhost=localhost " + "-p " + port + " -m 5g " + " -z "
 						+ zookeeper.getZookeeperIp() + ":" + zookeeper.getZookeeperPort(), nodeDirectory);
 			} else {
 				returnValue = Util.execute(nodeDirectory + "solr start -force " + "-p " + port + " -m 5g ",
