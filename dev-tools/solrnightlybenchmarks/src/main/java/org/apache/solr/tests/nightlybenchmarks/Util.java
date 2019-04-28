@@ -104,7 +104,7 @@ public class Util {
 	public static String RUN_DIR = BASE_DIR + "RunDirectory" + File.separator;
 	public static String DOWNLOAD_DIR = BASE_DIR + "Download" + File.separator;
 	public static String ZOOKEEPER_DOWNLOAD_URL = "http://www.us.apache.org/dist/zookeeper/";
-	public static String ZOOKEEPER_RELEASE = "3.4.10";
+	public static String ZOOKEEPER_RELEASE = "3.4.14";
 	public static String ZOOKEEPER_DIR = RUN_DIR;
 	public static String SOLR_DIR = RUN_DIR;
 	public static String ZOOKEEPER_IP = "127.0.0.1";

@@ -18,7 +18,9 @@
 package org.apache.solr.tests.nightlybenchmarks;
 
 import java.io.File;
+import java.net.URL;
 
+import org.apache.commons.io.FileUtils;
 import org.apache.log4j.Logger;
 
 enum ZookeeperAction {
@@ -74,9 +76,9 @@ public class Zookeeper {
 
 			String fileName = "zookeeper-" + Util.ZOOKEEPER_RELEASE + ".tar.gz";
 
-			Util.download(
-					Util.ZOOKEEPER_DOWNLOAD_URL + "zookeeper-" + Util.ZOOKEEPER_RELEASE + File.separator + fileName,
-					Util.DOWNLOAD_DIR + fileName);
+			FileUtils.copyURLToFile(
+					new URL(Util.ZOOKEEPER_DOWNLOAD_URL + "zookeeper-" + Util.ZOOKEEPER_RELEASE + File.separator + fileName),
+					new File(Util.DOWNLOAD_DIR + fileName));
 		} else {
 			logger.info("Release present nothing to download ...");
 		}
