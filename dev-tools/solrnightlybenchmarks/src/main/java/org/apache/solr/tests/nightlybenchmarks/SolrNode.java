@@ -29,7 +29,6 @@ import java.util.Map;
 import java.util.UUID;
 
 import org.apache.commons.io.FilenameUtils;
-import org.apache.solr.tests.nightlybenchmarks.BenchmarkAppConnector.FileType;
 import org.eclipse.jgit.api.Git;
 import org.eclipse.jgit.api.PullCommand;
 import org.eclipse.jgit.api.errors.GitAPIException;
@@ -149,11 +148,9 @@ public class SolrNode {
 				repository.checkout().setName(commitId).call();
 			}
 		} else {
-			BenchmarkAppConnector.writeToWebAppDataFile("iamcloning.txt", "", true, FileType.IS_CLONING_FILE);
 			repository = Git.cloneRepository().setURI(Util.LUCENE_SOLR_REPOSITORY_URL).setDirectory(gitDirectory)
 					.call();
 			repository.checkout().setName(commitId).call();
-			BenchmarkAppConnector.deleteFolder(FileType.IS_CLONING_FILE);
 		}
 
 		for (RevCommit revCommit: repository.log().call()) {
@@ -242,50 +239,6 @@ public class SolrNode {
 		
 		log.info("Time taken for the node " + action + " activity is: " + (end - start) + " millisecond(s)");
 		return returnValue;
-	}
-
-	/**
-	 * A method used for creating a collection on a solr node. 
-	 * @param coreName
-	 * @param collectionName
-	 * @return
-	 * @throws Exception 
-	 */
-	@SuppressWarnings("deprecation")
-	public Map<String, String> createCollection(BenchmarkConfiguration configuration, String coreName, String collectionName)
-			throws Exception {
-
-		long start;
-		long end;
-		int returnVal;
-
-		Thread thread = new Thread(
-				new MetricCollector(configuration, this.port));
-		thread.start();
-
-		this.collectionName = collectionName;
-		log.info("Creating core ... ");
-
-		start = System.currentTimeMillis();
-		returnVal = Util.execute(
-				"./solr create_core -c " + coreName + " -p " + port + " -collection " + collectionName + " -force",
-				nodeDirectory);
-		end = System.currentTimeMillis();
-		log.info("Time for creating the core is: " + (end - start) + " millisecond(s)");
-		thread.stop();
-
-		Thread.sleep(5000);
-		
-		Map<String, String> returnMap = new HashMap<String, String>();
-		Date dNow = new Date();
-		SimpleDateFormat ft = new SimpleDateFormat("yyyy/MM/dd HH:mm:ss");
-
-		returnMap.put("ProcessExitValue", "" + returnVal);
-		returnMap.put("TimeStamp", "" + ft.format(dNow));
-		returnMap.put("CreateCollectionTime", "" + ((double) (end - start) / 1000d));
-		returnMap.put("CommitID", this.commitId);
-
-		return returnMap;
 	}
 
 	/**
