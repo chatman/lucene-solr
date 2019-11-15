@@ -184,7 +184,7 @@
 				<configuration>
 					<archive>
 						<manifest>
-							<mainClass>org.apache.solr.tests.nightlybenchmarks.SolrNightlyBenchmarks</mainClass>
+							<mainClass>org.apache.solr.tests.nightlybenchmarks.BenchmarksMain</mainClass>
 						</manifest>
 					</archive>
 					<descriptorRefs>
@@ -195,8 +195,9 @@
 			<plugin>
 			    <groupId>org.eclipse.jetty</groupId>
 			    <artifactId>jetty-maven-plugin</artifactId>
-			    <version>9.4.0.M0</version>
+			    <version>9.4.22.v20191022</version>
 			     <configuration>
+<supportedPackagings>jar</supportedPackagings>
 	                <httpConnector>
 	                    <port>4444</port>
 	                </httpConnector>
