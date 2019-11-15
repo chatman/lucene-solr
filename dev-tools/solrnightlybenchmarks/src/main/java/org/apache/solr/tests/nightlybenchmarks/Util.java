@@ -162,7 +162,7 @@ public class Util {
 		ProcessStreamReader processOutputStream = null;
 
 		try {
-			proc = rt.exec(command, new String[] {}, workingDirectory);
+			proc = rt.exec(command, new String[] {"JAVA_HOME=/usr/lib/jvm/java-1.8.0-openjdk"}, workingDirectory);
 
 			processErrorStream = new ProcessStreamReader(proc.getErrorStream(), "ERROR");
 			processOutputStream = new ProcessStreamReader(proc.getInputStream(), "OUTPUT");
@@ -176,6 +176,15 @@ public class Util {
 			throw new Exception(e.getMessage());
 		}
 	}
+
+  public static Map map(Object... params) {
+    LinkedHashMap ret = new LinkedHashMap();
+    for (int i=0; i<params.length; i+=2) {
+      Object o = ret.put(params[i], params[i+1]);
+      // TODO: handle multi-valued map?
+    }
+    return ret;
+  }
 
 	/**
 	 * A method for printing output on a single line.

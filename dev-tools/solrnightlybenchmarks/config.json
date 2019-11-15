@@ -9,7 +9,7 @@
         {
           "setup-name": "cloud_2x2",
           "collection": "cloud_2x2",
-          "replicationFactor": 2,
+          "replication-factor": 2,
           "shards": 2,
           "min-threads": 1,
           "max-threads": 3
@@ -17,7 +17,7 @@
         {
 	  "setup-name": "cloud_1x1",
           "collection": "cloud_1x1",
-          "replicationFactor": 1,
+          "replication-factor": 1,
           "shards": 1,
           "min-threads": 1,
           "max-threads": 3
@@ -29,7 +29,6 @@
     {
       "name": "TERM_NUMERIC_QUERY_CLOUD_2T",
       "description": "some shit describing the benchmark",
-      "replication-type": "cloud or standalone",
       "collection": "cloud_2x2",
       "query-file": "small-data/queryFile",
       "client-type": "CUSC or CSC or HSC etc.",

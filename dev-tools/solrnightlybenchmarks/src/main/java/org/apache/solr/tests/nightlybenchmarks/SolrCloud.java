@@ -18,10 +18,13 @@
 package org.apache.solr.tests.nightlybenchmarks;
 
 import java.io.IOException;
+import java.lang.invoke.MethodHandles;
 import java.util.ArrayList;
 import java.util.List;
 
-import org.apache.log4j.Logger;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+
 
 /**
  * This class provides a blueprint for SolrCloud
@@ -30,7 +33,7 @@ import org.apache.log4j.Logger;
  */
 public class SolrCloud {
 
-	public final static Logger logger = Logger.getLogger(SolrCloud.class);
+  private static final Logger log = LoggerFactory.getLogger(MethodHandles.lookup().lookupClass());
 
 	final int numNodes;
 	Zookeeper zookeeper;
@@ -50,7 +53,7 @@ public class SolrCloud {
 		zookeeper = new Zookeeper();
 		int initValue = zookeeper.doAction(ZookeeperAction.ZOOKEEPER_START);
 		if (initValue != 0) {
-			logger.error("Failed to start Zookeeper!");
+			log.error("Failed to start Zookeeper!");
 			throw new RuntimeException("Failed to start Zookeeper!");
 		}
 
@@ -75,7 +78,7 @@ public class SolrCloud {
 		try {
 			nodes.get(0).createCollection(collectionName, configName, shards, replicas);
 		} catch (IOException | InterruptedException e) {
-			logger.error(e.getMessage());
+			log.error(e.getMessage());
 			throw new Exception(e.getMessage());
 		}
 	}
@@ -90,7 +93,7 @@ public class SolrCloud {
 		try {
 			nodes.get(0).deleteCollection(collectionName);
 		} catch (IOException | InterruptedException e) {
-			logger.error(e.getMessage());
+			log.error(e.getMessage());
 			throw new Exception(e.getMessage());
 		}
 	}
