@@ -4,16 +4,16 @@
       "name": "CLOUD_INDEXING",
       "description": "Wikipedia dataset on SolrCloud",
       "replication-type": "cloud",
-      "dataset-file": "small-data/small-enwiki.tsv",
+      "dataset-file": "small-data/small-enwiki.tsv.gz",
       "setups": [
         {
           "setup-name": "cloud_2x2",
           "collection": "cloud_2x2",
           "replication-factor": 2,
           "shards": 2,
-          "min-threads": 2,
+          "min-threads": 4,
           "max-threads": 12,
-          "thread-step": 2
+          "thread-step": 4
         }
       ]
     }

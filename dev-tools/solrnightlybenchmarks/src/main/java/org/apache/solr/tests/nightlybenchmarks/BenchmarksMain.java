@@ -12,6 +12,7 @@ import java.util.Map;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.TimeUnit;
+import java.util.zip.GZIPInputStream;
 
 import org.apache.commons.compress.compressors.lzma.LZMACompressorInputStream;
 import org.apache.commons.io.FileUtils;
@@ -83,7 +84,7 @@ public class BenchmarksMain {
               solrCloud.deleteCollection(setup.collection);
             }
 
-            timings.put("Threads: " + i, String.valueOf((end-start)/10000000.0));
+            timings.put("Threads: " + i, String.valueOf((end-start)/1_000_000_000.0));
           }
 
           System.out.println("Final metrics: "+timings);
@@ -136,36 +137,37 @@ public class BenchmarksMain {
   static void index(SolrCloud solrCloud, String collectionName, int threads, String datasetFile) throws IOException, SolrServerException {
 
     ConcurrentUpdateSolrClient client = new ConcurrentUpdateSolrClient(
-        solrCloud.nodes.get(0).getBaseUrl()+collectionName, 10000, threads);
-    if (datasetFile.endsWith(".tsv")) {
-      File file = new File(datasetFile);
+        solrCloud.nodes.get(0).getBaseUrl()+collectionName, 100_000, threads);
+    File file = new File(datasetFile);
 
-      BufferedReader br;
+    BufferedReader br;
 
-      if(datasetFile.endsWith(".lzma") || datasetFile.endsWith(".xz")) {
-        LZMACompressorInputStream lzma = new LZMACompressorInputStream(new FileInputStream(file));
-        br = new BufferedReader(new InputStreamReader(lzma));
-      } else {
-        br = new BufferedReader(new FileReader(file));
-      }
-      String line;
-      int counter = 0;
-      while ((line = br.readLine()) != null) {
-        counter++;
-
-        String fields[] = line.split("\t");
-        int id = counter;
-        String title = fields[0];
-        String date = fields[1];
-        String text = fields[2];
-
-        SolrInputDocument doc = new SolrInputDocument("id", String.valueOf(id),
-            "title", title, "timestamp_s", date, "text_t", text);
-        client.add(doc);
-      }
-
-      br.close();
+    if(datasetFile.endsWith(".lzma") || datasetFile.endsWith(".xz")) {
+      LZMACompressorInputStream lzma = new LZMACompressorInputStream(new FileInputStream(file));
+      br = new BufferedReader(new InputStreamReader(lzma));
+    } else if (datasetFile.endsWith(".gz")) {
+      GZIPInputStream gzip = new GZIPInputStream(new FileInputStream(file));
+      br = new BufferedReader(new InputStreamReader(gzip));
+    }  else {
+      br = new BufferedReader(new FileReader(file));
     }
+    String line;
+    int counter = 0;
+    while ((line = br.readLine()) != null) {
+      counter++;
+
+      String fields[] = line.split("\t");
+      int id = counter;
+      String title = fields[0];
+      String date = fields[1];
+      String text = fields[2];
+
+      SolrInputDocument doc = new SolrInputDocument("id", String.valueOf(id),
+          "title", title, "timestamp_s", date, "text_t", text);
+      client.add(doc);
+    }
+    log.info("Indexed "+counter+" docs.");
+    br.close();
     client.commit();
     client.close();
   }
