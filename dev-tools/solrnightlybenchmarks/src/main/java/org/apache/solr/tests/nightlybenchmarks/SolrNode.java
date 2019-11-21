@@ -37,7 +37,7 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 enum SolrNodeAction {
-	NODE_START, NODE_STOP
+  NODE_START, NODE_STOP
 }
 
 /**
@@ -51,287 +51,287 @@ public class SolrNode {
 
   public static final String URL_BASE = "http://archive.apache.org/dist/lucene/solr/";
 
-	public boolean isRunningInCloudMode;
-	public String solrDirName;
-	public String collectionName;
-	public String baseDirectory;
-	public String port;
-	private String nodeDirectory;
-	private final String commitId;
-	public int commitTime;
-	private final Zookeeper zookeeper;
-	private String gitDirectoryPath = Util.DOWNLOAD_DIR + "git-repository-";
+  public boolean isRunningInCloudMode;
+  public String solrDirName;
+  public String collectionName;
+  public String baseDirectory;
+  public String port;
+  private String nodeDirectory;
+  private final String commitId;
+  public int commitTime;
+  private final Zookeeper zookeeper;
+  private String gitDirectoryPath = Util.DOWNLOAD_DIR + "git-repository-";
 
-	/**
-	 * Constructor. 
-	 * @param commitId
-	 * @param zooKeeperIp
-	 * @param zooKeeperPort
-	 * @param isRunningInCloudMode
-	 * @throws Exception 
-	 */
-	public SolrNode(String commitId, Zookeeper zookeeper, boolean isRunningInCloudMode)
-			throws Exception {
-		super();
-		this.commitId = commitId;
-		this.zookeeper = zookeeper;
-		this.isRunningInCloudMode = isRunningInCloudMode;
-		//this.gitDirectoryPath = Util.DOWNLOAD_DIR + "git-repository-" + commitId;
-		this.gitDirectoryPath = Util.DOWNLOAD_DIR + "git-repository";
-		Util.GIT_REPOSITORY_PATH = this.gitDirectoryPath;
-		this.install();
-	}
+  /**
+   * Constructor. 
+   * @param commitId
+   * @param zooKeeperIp
+   * @param zooKeeperPort
+   * @param isRunningInCloudMode
+   * @throws Exception 
+   */
+  public SolrNode(String commitId, Zookeeper zookeeper, boolean isRunningInCloudMode)
+      throws Exception {
+    super();
+    this.commitId = commitId;
+    this.zookeeper = zookeeper;
+    this.isRunningInCloudMode = isRunningInCloudMode;
+    //this.gitDirectoryPath = Util.DOWNLOAD_DIR + "git-repository-" + commitId;
+    this.gitDirectoryPath = Util.DOWNLOAD_DIR + "git-repository";
+    Util.GIT_REPOSITORY_PATH = this.gitDirectoryPath;
+    this.install();
+  }
 
-	/**
-	 * A method used for initializing the solr node.
-	 * @throws Exception 
-	 * @throws InterruptedException 
-	 */
-	private void install() throws Exception {
+  /**
+   * A method used for initializing the solr node.
+   * @throws Exception 
+   * @throws InterruptedException 
+   */
+  private void install() throws Exception {
 
-		log.debug("Installing Solr Node ...");
-		
-		this.port = String.valueOf(Util.getFreePort());
+    log.debug("Installing Solr Node ...");
 
-		this.baseDirectory = Util.SOLR_DIR + UUID.randomUUID().toString() + File.separator;
-		this.nodeDirectory = this.baseDirectory;
+    this.port = String.valueOf(Util.getFreePort());
 
-		try {
+    this.baseDirectory = Util.SOLR_DIR + UUID.randomUUID().toString() + File.separator;
+    this.nodeDirectory = this.baseDirectory;
 
-			log.debug("Checking if SOLR node directory exists ...");
+    try {
 
-			File node = new File(nodeDirectory);
+      log.debug("Checking if SOLR node directory exists ...");
 
-			if (!node.exists()) {
+      File node = new File(nodeDirectory);
 
-				log.debug("Node directory does not exist, creating it ...");
-				node.mkdir();
-			} 
+      if (!node.exists()) {
 
-		} catch (Exception e) {
-			log.error(e.getMessage());
-			throw new Exception(e.getMessage());
-		}
+        log.debug("Node directory does not exist, creating it ...");
+        node.mkdir();
+      } 
 
-		this.checkoutCommitAndBuild();
-		Util.extract(Util.DOWNLOAD_DIR + "solr-" + commitId + ".zip", nodeDirectory);
-		
-		this.nodeDirectory = new File(this.nodeDirectory).listFiles()[0] + File.separator + "bin" + File.separator;
-	}
+    } catch (Exception e) {
+      log.error(e.getMessage());
+      throw new Exception(e.getMessage());
+    }
 
-	/**
-	 * A method used for checking out the solr code based on a commit and build the package for testing.
-	 * @throws Exception 
-	 */
-	void checkoutCommitAndBuild() throws Exception {
-	
-		log.info("Checking out Solr: " + commitId + " ...");
+    this.checkoutCommitAndBuild();
+    Util.extract(Util.DOWNLOAD_DIR + "solr-" + commitId + ".zip", nodeDirectory);
 
-		File gitDirectory = new File(gitDirectoryPath);
-		Git repository;
+    this.nodeDirectory = new File(this.nodeDirectory).listFiles()[0] + File.separator + "bin" + File.separator;
+  }
 
-		if (gitDirectory.exists()) {
-			repository = Git.open(gitDirectory);
+  /**
+   * A method used for checking out the solr code based on a commit and build the package for testing.
+   * @throws Exception 
+   */
+  void checkoutCommitAndBuild() throws Exception {
 
-			if (!Util.getHeadName(repository.getRepository()).equals(commitId)) {
+    log.info("Checking out Solr: " + commitId + " ...");
 
-				repository.checkout().setName("master").call();
-				
-				PullCommand pullCmd = repository.pull();
-				try {
-				    pullCmd.call();
-				} catch (GitAPIException e) {
-					log.error(e.getMessage());
-				    throw new Exception(e.getMessage());
-				}
-				
-				repository.checkout().setName(commitId).call();
-			}
-		} else {
-			repository = Git.cloneRepository().setURI(Util.LUCENE_SOLR_REPOSITORY_URL).setDirectory(gitDirectory)
-					.call();
-			repository.checkout().setName(commitId).call();
-		}
+    File gitDirectory = new File(gitDirectoryPath);
+    Git repository;
 
-		for (RevCommit revCommit: repository.log().call()) {
-			if (revCommit.getId().name().equals(commitId)) {
-				this.commitTime = revCommit.getCommitTime();
-				break;
-			}
-		}
+    if (gitDirectory.exists()) {
+      repository = Git.open(gitDirectory);
 
-		String packageFilename = gitDirectoryPath + "/solr/package/";
-		Util.SOLR_PACKAGE_DIR = packageFilename;
-		Util.SOLR_PACKAGE_DIR_LOCATION = gitDirectoryPath;
-		String tarballLocation = Util.DOWNLOAD_DIR + "solr-" + commitId + ".zip";
+      if (!Util.getHeadName(repository.getRepository()).equals(commitId)) {
 
-		if (!new File(tarballLocation).exists()) {
-			log.debug("There were new changes, need to rebuild ...");
-			Util.execute("ant ivy-bootstrap", gitDirectoryPath);
-			// Util.execute("ant compile", gitDirectoryPath);
-			Util.execute("ant package", gitDirectoryPath + File.separator + "solr");
-			
-			if (new File(packageFilename).exists()) {
-				
-				File subDirPath = new File(gitDirectoryPath + "/solr/package/");
-				String fileName = "";
-				if (subDirPath.exists()) {
-					File[] files = subDirPath.listFiles();
-					for (int i = 0; i < files.length; i++) {
-							if (FilenameUtils.isExtension(files[i].getName(), "zip")) {
-								fileName = files[i].getName();
-								break;
-							}
-					}
-				}
-				this.solrDirName = fileName;
-				packageFilename += fileName;
-				
-				log.debug("Trying to copy: " + packageFilename + " to " + tarballLocation);
-				Files.copy(Paths.get(packageFilename), Paths.get(tarballLocation));
-				log.debug("File copied!");
+        repository.checkout().setName("master").call();
 
-			} else {
-				log.error("Couldn't build the package");
-				throw new IOException("Couldn't build the package"); 
-			}
-		} 
-		
-		log.debug("Do we have packageFilename? " + (new File(tarballLocation).exists() ? "yes" : "no") + " ...");
-	}
+        PullCommand pullCmd = repository.pull();
+        try {
+          pullCmd.call();
+        } catch (GitAPIException e) {
+          log.error(e.getMessage());
+          throw new Exception(e.getMessage());
+        }
 
-	/**
-	 * A method used to do action (start, stop ... etc.) a solr node. 
-	 * @param action
-	 * @return
-	 * @throws Exception 
-	 */
-	public int doAction(SolrNodeAction action) throws Exception {
+        repository.checkout().setName(commitId).call();
+      }
+    } else {
+      repository = Git.cloneRepository().setURI(Util.LUCENE_SOLR_REPOSITORY_URL).setDirectory(gitDirectory)
+          .call();
+      repository.checkout().setName(commitId).call();
+    }
 
-		long start = 0;
-		long end = 0;
-		int returnValue = 0;
+    for (RevCommit revCommit: repository.log().call()) {
+      if (revCommit.getId().name().equals(commitId)) {
+        this.commitTime = revCommit.getCommitTime();
+        break;
+      }
+    }
 
-		start = System.currentTimeMillis();
-		new File(nodeDirectory + "solr").setExecutable(true);
-		if (action == SolrNodeAction.NODE_START) {
+    String packageFilename = gitDirectoryPath + "/solr/package/";
+    Util.SOLR_PACKAGE_DIR = packageFilename;
+    Util.SOLR_PACKAGE_DIR_LOCATION = gitDirectoryPath;
+    String tarballLocation = Util.DOWNLOAD_DIR + "solr-" + commitId + ".zip";
 
-			if (isRunningInCloudMode) {
-				returnValue = Util.execute(nodeDirectory + "solr start -force -Dhost=localhost " + "-p " + port + " -m 5g " + " -z "
-						+ zookeeper.getZookeeperIp() + ":" + zookeeper.getZookeeperPort(), nodeDirectory);
-			} else {
-				returnValue = Util.execute(nodeDirectory + "solr start -force " + "-p " + port + " -m 5g ",
-						nodeDirectory);
-			}
+    if (!new File(tarballLocation).exists()) {
+      log.debug("There were new changes, need to rebuild ...");
+      Util.execute("ant ivy-bootstrap", gitDirectoryPath);
+      // Util.execute("ant compile", gitDirectoryPath);
+      Util.execute("ant package", gitDirectoryPath + File.separator + "solr");
 
-		} else if (action == SolrNodeAction.NODE_STOP) {
+      if (new File(packageFilename).exists()) {
 
-			if (isRunningInCloudMode) {
-				returnValue = Util.execute(
-						nodeDirectory + "solr stop -p " + port + " -z " + zookeeper.getZookeeperIp() + ":" + zookeeper.getZookeeperPort() + " -force",
-						nodeDirectory);
-			} else {
-				returnValue = Util.execute(nodeDirectory + "solr stop -p " + port + " -force", nodeDirectory);
-			}
+        File subDirPath = new File(gitDirectoryPath + "/solr/package/");
+        String fileName = "";
+        if (subDirPath.exists()) {
+          File[] files = subDirPath.listFiles();
+          for (int i = 0; i < files.length; i++) {
+            if (FilenameUtils.isExtension(files[i].getName(), "zip")) {
+              fileName = files[i].getName();
+              break;
+            }
+          }
+        }
+        this.solrDirName = fileName;
+        packageFilename += fileName;
 
-		}
-		end = System.currentTimeMillis();
-		
-		log.info("Time taken for the node " + action + " activity is: " + (end - start) + " millisecond(s)");
-		return returnValue;
-	}
+        log.debug("Trying to copy: " + packageFilename + " to " + tarballLocation);
+        Files.copy(Paths.get(packageFilename), Paths.get(tarballLocation));
+        log.debug("File copied!");
 
-	/**
-	 * A method used for creating collection on the solr cloud. 
-	 * @param collectionName
-	 * @param configName
-	 * @param shards
-	 * @param replicationFactor
-	 * @return
-	 * @throws Exception 
-	 */
-	@SuppressWarnings("deprecation")
-	public Map<String, String> createCollection(String collectionName, String configName, int shards,
-			int replicas) throws Exception {
+      } else {
+        log.error("Couldn't build the package");
+        throw new IOException("Couldn't build the package"); 
+      }
+    } 
 
-		this.collectionName = collectionName;
-		log.info("Creating collection: " + collectionName + " ... ");
+    log.debug("Do we have packageFilename? " + (new File(tarballLocation).exists() ? "yes" : "no") + " ...");
+  }
 
-		long start;
-		long end;
-		int returnVal;
+  /**
+   * A method used to do action (start, stop ... etc.) a solr node. 
+   * @param action
+   * @return
+   * @throws Exception 
+   */
+  public int doAction(SolrNodeAction action) throws Exception {
 
-		if (configName != null) {
-			start = System.currentTimeMillis();
-			returnVal = Util.execute("./solr create_collection -collection " + collectionName + " -shards " + shards
-					+ " -n " + configName + " -replicationFactor " + replicas + " -force", nodeDirectory);
-			end = System.currentTimeMillis();
-		} else {
-			start = System.currentTimeMillis();
-			returnVal = Util.execute("./solr create_collection -collection " + collectionName + " -shards " + shards
-					+ " -replicationFactor " + replicas + " -force", nodeDirectory);
-			end = System.currentTimeMillis();
-		}
+    long start = 0;
+    long end = 0;
+    int returnValue = 0;
 
-		log.info("Time for creating the collection is: " + (end - start) + " millisecond(s)");
+    start = System.currentTimeMillis();
+    new File(nodeDirectory + "solr").setExecutable(true);
+    if (action == SolrNodeAction.NODE_START) {
 
-		Thread.sleep(5000);
-		
-		Map<String, String> returnMap = new HashMap<String, String>();
-		Date dNow = new Date();
-		SimpleDateFormat ft = new SimpleDateFormat("yyyy/MM/dd HH:mm:ss");
+      if (isRunningInCloudMode) {
+        returnValue = Util.execute(nodeDirectory + "solr start -force -Dhost=localhost " + "-p " + port + " -m 5g " + " -z "
+            + zookeeper.getZookeeperIp() + ":" + zookeeper.getZookeeperPort(), nodeDirectory);
+      } else {
+        returnValue = Util.execute(nodeDirectory + "solr start -force " + "-p " + port + " -m 5g ",
+            nodeDirectory);
+      }
 
-		returnMap.put("ProcessExitValue", "" + returnVal);
-		returnMap.put("TimeStamp", "" + ft.format(dNow));
-		returnMap.put("CreateCollectionTime", "" + ((double) (end - start) / 1000d));
-		returnMap.put("CommitID", this.commitId);
+    } else if (action == SolrNodeAction.NODE_STOP) {
 
-		return returnMap;
-	}
+      if (isRunningInCloudMode) {
+        returnValue = Util.execute(
+            nodeDirectory + "solr stop -p " + port + " -z " + zookeeper.getZookeeperIp() + ":" + zookeeper.getZookeeperPort() + " -force",
+            nodeDirectory);
+      } else {
+        returnValue = Util.execute(nodeDirectory + "solr stop -p " + port + " -force", nodeDirectory);
+      }
 
-	/**
-	 * A method for deleting a collection on a solr cloud or a node. 
-	 * @param collectionName
-	 * @return
-	 * @throws Exception 
-	 */
-	public int deleteCollection(String collectionName) throws Exception {
+    }
+    end = System.currentTimeMillis();
 
-		this.collectionName = collectionName;
-		log.info("Deleting collection: "+collectionName+" ... ");
-		return Util.execute("./solr delete -c " + collectionName + " -deleteConfig true", nodeDirectory);
+    log.info("Time taken for the node " + action + " activity is: " + (end - start) + " millisecond(s)");
+    return returnValue;
+  }
 
-	}
+  /**
+   * A method used for creating collection on the solr cloud. 
+   * @param collectionName
+   * @param configName
+   * @param shards
+   * @param replicationFactor
+   * @return
+   * @throws Exception 
+   */
+  @SuppressWarnings("deprecation")
+  public Map<String, String> createCollection(String collectionName, String configName, int shards,
+      int replicas) throws Exception {
 
-	/**
-	 * A method to get the node directory for the solr node. 
-	 * @return
-	 */
-	public String getNodeDirectory() {
-		return nodeDirectory;
-	}
+    this.collectionName = collectionName;
+    log.info("Creating collection: " + collectionName + " ... ");
 
-	/**
-	 * A method used for getting the URL for the solr node for communication. 
-	 * @return
-	 */
-	public String getBaseUrl() {
-		return "http://localhost:" + port + "/solr/";
-	}
+    long start;
+    long end;
+    int returnVal;
 
-	/**
-	 * A method used for getting the URL (containing the collection reference) for the solr node.  
-	 * @return
-	 */
-	public String getBaseUrlC() {
-		return "http://localhost:" + port + "/solr/" + this.collectionName;
-	}
+    if (configName != null) {
+      start = System.currentTimeMillis();
+      returnVal = Util.execute("./solr create_collection -collection " + collectionName + " -shards " + shards
+          + " -n " + configName + " -replicationFactor " + replicas + " -force", nodeDirectory);
+      end = System.currentTimeMillis();
+    } else {
+      start = System.currentTimeMillis();
+      returnVal = Util.execute("./solr create_collection -collection " + collectionName + " -shards " + shards
+          + " -replicationFactor " + replicas + " -force", nodeDirectory);
+      end = System.currentTimeMillis();
+    }
 
-	/**
-	 * A method used for cleaning up the files for the solr node. 
-	 * @throws Exception 
-	 */
-	public void cleanup() throws Exception {
-		Util.execute("rm -r -f " + baseDirectory, baseDirectory);
-	}
+    log.info("Time for creating the collection is: " + (end - start) + " millisecond(s)");
+
+    Thread.sleep(5000);
+
+    Map<String, String> returnMap = new HashMap<String, String>();
+    Date dNow = new Date();
+    SimpleDateFormat ft = new SimpleDateFormat("yyyy/MM/dd HH:mm:ss");
+
+    returnMap.put("ProcessExitValue", "" + returnVal);
+    returnMap.put("TimeStamp", "" + ft.format(dNow));
+    returnMap.put("CreateCollectionTime", "" + ((double) (end - start) / 1000d));
+    returnMap.put("CommitID", this.commitId);
+
+    return returnMap;
+  }
+
+  /**
+   * A method for deleting a collection on a solr cloud or a node. 
+   * @param collectionName
+   * @return
+   * @throws Exception 
+   */
+  public int deleteCollection(String collectionName) throws Exception {
+
+    this.collectionName = collectionName;
+    log.info("Deleting collection: "+collectionName+" ... ");
+    return Util.execute("./solr delete -c " + collectionName + " -deleteConfig true", nodeDirectory);
+
+  }
+
+  /**
+   * A method to get the node directory for the solr node. 
+   * @return
+   */
+  public String getNodeDirectory() {
+    return nodeDirectory;
+  }
+
+  /**
+   * A method used for getting the URL for the solr node for communication. 
+   * @return
+   */
+  public String getBaseUrl() {
+    return "http://localhost:" + port + "/solr/";
+  }
+
+  /**
+   * A method used for getting the URL (containing the collection reference) for the solr node.  
+   * @return
+   */
+  public String getBaseUrlC() {
+    return "http://localhost:" + port + "/solr/" + this.collectionName;
+  }
+
+  /**
+   * A method used for cleaning up the files for the solr node. 
+   * @throws Exception 
+   */
+  public void cleanup() throws Exception {
+    Util.execute("rm -r -f " + baseDirectory, baseDirectory);
+  }
 }

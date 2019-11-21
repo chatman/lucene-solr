@@ -8,7 +8,7 @@ public class QueryBenchmark {
 
   @JsonProperty("description")
   public String description;
-  
+
   @JsonProperty("collection")
   public String collection;
 

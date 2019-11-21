@@ -56,6 +56,13 @@
     <version>3.2.2</version>
 </dependency>
 
+<!-- https://mvnrepository.com/artifact/org.apache.commons/commons-compress -->
+<dependency>
+    <groupId>org.apache.commons</groupId>
+    <artifactId>commons-compress</artifactId>
+    <version>1.19</version>
+</dependency>
+
 <!-- https://mvnrepository.com/artifact/net.sf.opencsv/opencsv -->
 <dependency>
     <groupId>net.sf.opencsv</groupId>

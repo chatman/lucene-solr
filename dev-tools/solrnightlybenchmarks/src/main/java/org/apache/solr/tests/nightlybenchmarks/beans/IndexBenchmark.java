@@ -10,13 +10,13 @@ public class IndexBenchmark {
 
   @JsonProperty("description")
   public String description;
-  
+
   @JsonProperty("replication-type")
   public String replicationType;
-  
+
   @JsonProperty("dataset-file")
   public String datasetFile;
-  
+
   @JsonProperty("setups")
   public List<Setup> setups;
 
@@ -38,6 +38,9 @@ public class IndexBenchmark {
 
     @JsonProperty("max-threads")
     public int maxThreads;
+    
+    @JsonProperty("thread-step")
+    public int threadStep;
   }
 }
 

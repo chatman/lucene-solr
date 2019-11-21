@@ -24,7 +24,7 @@ import org.apache.commons.io.FileUtils;
 import org.apache.log4j.Logger;
 
 enum ZookeeperAction {
-	ZOOKEEPER_START, ZOOKEEPER_STOP, ZOOKEEPER_CLEAN
+  ZOOKEEPER_START, ZOOKEEPER_STOP, ZOOKEEPER_CLEAN
 }
 
 /**
@@ -35,115 +35,115 @@ enum ZookeeperAction {
  */
 public class Zookeeper {
 
-	public final static Logger logger = Logger.getLogger(Zookeeper.class);
+  public final static Logger logger = Logger.getLogger(Zookeeper.class);
 
-	public static String zooCommand;
-	public static String zooCleanCommand;
+  public static String zooCommand;
+  public static String zooCleanCommand;
 
-	static {
-		zooCommand = System.getProperty("os.name") != null && System.getProperty("os.name").startsWith("Windows")
-				? "bin" + File.separator + "zkServer.cmd " : "bin" + File.separator + "zkServer.sh ";
-	}
+  static {
+    zooCommand = System.getProperty("os.name") != null && System.getProperty("os.name").startsWith("Windows")
+        ? "bin" + File.separator + "zkServer.cmd " : "bin" + File.separator + "zkServer.sh ";
+  }
 
-	/**
-	 * Constructor.
-	 * 
-	 * @throws Exception
-	 */
-	Zookeeper() throws Exception {
-		super();
-		this.install();
-	}
+  /**
+   * Constructor.
+   * 
+   * @throws Exception
+   */
+  Zookeeper() throws Exception {
+    super();
+    this.install();
+  }
 
-	/**
-	 * A method for setting up zookeeper node.
-	 * 
-	 * @throws Exception
-	 */
-	private void install() throws Exception {
+  /**
+   * A method for setting up zookeeper node.
+   * 
+   * @throws Exception
+   */
+  private void install() throws Exception {
 
-		logger.info("Installing Zookeeper Node ...");
+    logger.info("Installing Zookeeper Node ...");
 
-		File base = new File(Util.ZOOKEEPER_DIR);
-		if (!base.exists()) {
-			base.mkdir();
-			base.setExecutable(true);
-		}
+    File base = new File(Util.ZOOKEEPER_DIR);
+    if (!base.exists()) {
+      base.mkdir();
+      base.setExecutable(true);
+    }
 
-		File release = new File(Util.DOWNLOAD_DIR + "zookeeper-" + Util.ZOOKEEPER_RELEASE + ".tar.gz");
-		if (!release.exists()) {
-			logger.info("Attempting to download zookeeper release ..." + " : " + Util.ZOOKEEPER_RELEASE);
+    File release = new File(Util.DOWNLOAD_DIR + "zookeeper-" + Util.ZOOKEEPER_RELEASE + ".tar.gz");
+    if (!release.exists()) {
+      logger.info("Attempting to download zookeeper release ..." + " : " + Util.ZOOKEEPER_RELEASE);
 
-			String fileName = "zookeeper-" + Util.ZOOKEEPER_RELEASE + ".tar.gz";
+      String fileName = "zookeeper-" + Util.ZOOKEEPER_RELEASE + ".tar.gz";
 
-			FileUtils.copyURLToFile(
-					new URL(Util.ZOOKEEPER_DOWNLOAD_URL + "zookeeper-" + Util.ZOOKEEPER_RELEASE + File.separator + fileName),
-					new File(Util.DOWNLOAD_DIR + fileName));
-		} else {
-			logger.info("Release present nothing to download ...");
-		}
+      FileUtils.copyURLToFile(
+          new URL(Util.ZOOKEEPER_DOWNLOAD_URL + "zookeeper-" + Util.ZOOKEEPER_RELEASE + File.separator + fileName),
+          new File(Util.DOWNLOAD_DIR + fileName));
+    } else {
+      logger.info("Release present nothing to download ...");
+    }
 
-		File urelease = new File(Util.DOWNLOAD_DIR + "zookeeper-" + Util.ZOOKEEPER_RELEASE);
-		if (!urelease.exists()) {
+    File urelease = new File(Util.DOWNLOAD_DIR + "zookeeper-" + Util.ZOOKEEPER_RELEASE);
+    if (!urelease.exists()) {
 
-			Util.execute("tar -xf " + Util.DOWNLOAD_DIR + "zookeeper-" + Util.ZOOKEEPER_RELEASE + ".tar.gz" + " -C "
-					+ Util.ZOOKEEPER_DIR, Util.ZOOKEEPER_DIR);
+      Util.execute("tar -xf " + Util.DOWNLOAD_DIR + "zookeeper-" + Util.ZOOKEEPER_RELEASE + ".tar.gz" + " -C "
+          + Util.ZOOKEEPER_DIR, Util.ZOOKEEPER_DIR);
 
-			Util.execute(
-					"mv " + Util.ZOOKEEPER_DIR + "zookeeper-" + Util.ZOOKEEPER_RELEASE + File.separator + "conf"
-							+ File.separator + "zoo_sample.cfg " + Util.ZOOKEEPER_DIR + "zookeeper-"
-							+ Util.ZOOKEEPER_RELEASE + File.separator + "conf" + File.separator + "zoo.cfg",
-					Util.ZOOKEEPER_DIR);
+      Util.execute(
+          "mv " + Util.ZOOKEEPER_DIR + "zookeeper-" + Util.ZOOKEEPER_RELEASE + File.separator + "conf"
+              + File.separator + "zoo_sample.cfg " + Util.ZOOKEEPER_DIR + "zookeeper-"
+              + Util.ZOOKEEPER_RELEASE + File.separator + "conf" + File.separator + "zoo.cfg",
+              Util.ZOOKEEPER_DIR);
 
-		} else {
-			logger.info("Release extracted already nothing to do ..." + " : " + Util.ZOOKEEPER_RELEASE);
-		}
-	}
+    } else {
+      logger.info("Release extracted already nothing to do ..." + " : " + Util.ZOOKEEPER_RELEASE);
+    }
+  }
 
-	/**
-	 * A method to act on the zookeeper node (start, stop etc...)
-	 * 
-	 * @param action
-	 * @return
-	 * @throws Exception
-	 */
-	public int doAction(ZookeeperAction action) throws Exception {
+  /**
+   * A method to act on the zookeeper node (start, stop etc...)
+   * 
+   * @param action
+   * @return
+   * @throws Exception
+   */
+  public int doAction(ZookeeperAction action) throws Exception {
 
-		new File(Util.ZOOKEEPER_DIR + "zookeeper-" + Util.ZOOKEEPER_RELEASE + File.separator + zooCommand)
-				.setExecutable(true);
+    new File(Util.ZOOKEEPER_DIR + "zookeeper-" + Util.ZOOKEEPER_RELEASE + File.separator + zooCommand)
+    .setExecutable(true);
 
-		if (action == ZookeeperAction.ZOOKEEPER_START) {
-			return Util.execute(
-					Util.ZOOKEEPER_DIR + "zookeeper-" + Util.ZOOKEEPER_RELEASE + File.separator + zooCommand + " start",
-					Util.ZOOKEEPER_DIR + "zookeeper-" + Util.ZOOKEEPER_RELEASE + File.separator);
-		} else if (action == ZookeeperAction.ZOOKEEPER_STOP) {
-			return Util.execute(
-					Util.ZOOKEEPER_DIR + "zookeeper-" + Util.ZOOKEEPER_RELEASE + File.separator + zooCommand + " stop",
-					Util.ZOOKEEPER_DIR + "zookeeper-" + Util.ZOOKEEPER_RELEASE + File.separator);
-		} else if (action == ZookeeperAction.ZOOKEEPER_CLEAN) {
-			Util.execute("rm -r -f " + Util.ZOOKEEPER_DIR, Util.ZOOKEEPER_DIR);
-			return Util.execute("rm -r -f /tmp/zookeeper/", "/tmp/zookeeper/");
-		}
+    if (action == ZookeeperAction.ZOOKEEPER_START) {
+      return Util.execute(
+          Util.ZOOKEEPER_DIR + "zookeeper-" + Util.ZOOKEEPER_RELEASE + File.separator + zooCommand + " start",
+          Util.ZOOKEEPER_DIR + "zookeeper-" + Util.ZOOKEEPER_RELEASE + File.separator);
+    } else if (action == ZookeeperAction.ZOOKEEPER_STOP) {
+      return Util.execute(
+          Util.ZOOKEEPER_DIR + "zookeeper-" + Util.ZOOKEEPER_RELEASE + File.separator + zooCommand + " stop",
+          Util.ZOOKEEPER_DIR + "zookeeper-" + Util.ZOOKEEPER_RELEASE + File.separator);
+    } else if (action == ZookeeperAction.ZOOKEEPER_CLEAN) {
+      Util.execute("rm -r -f " + Util.ZOOKEEPER_DIR, Util.ZOOKEEPER_DIR);
+      return Util.execute("rm -r -f /tmp/zookeeper/", "/tmp/zookeeper/");
+    }
 
-		return -1;
-	}
+    return -1;
+  }
 
-	/**
-	 * A method for getting the zookeeper IP.
-	 * 
-	 * @return
-	 */
-	public String getZookeeperIp() {
-		return Util.ZOOKEEPER_IP;
-	}
+  /**
+   * A method for getting the zookeeper IP.
+   * 
+   * @return
+   */
+  public String getZookeeperIp() {
+    return Util.ZOOKEEPER_IP;
+  }
 
-	/**
-	 * A method for getting the zookeeper Port.
-	 * 
-	 * @return
-	 */
-	public String getZookeeperPort() {
-		return Util.ZOOKEEPER_PORT;
-	}
+  /**
+   * A method for getting the zookeeper Port.
+   * 
+   * @return
+   */
+  public String getZookeeperPort() {
+    return Util.ZOOKEEPER_PORT;
+  }
 
 }

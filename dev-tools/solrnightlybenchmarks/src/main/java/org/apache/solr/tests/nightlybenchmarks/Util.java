@@ -143,8 +143,8 @@ public class Util {
     ProcessStreamReader processOutputStream = null;
 
     try {
-      proc = rt.exec(command, new String[] {"JAVA_HOME=/usr/lib/jvm/java-1.8.0-openjdk"}, workingDirectory);
-
+      //      proc = rt.exec(command, new String[] {"JAVA_HOME=/usr/lib/jvm/java-1.8.0-openjdk"}, workingDirectory);
+      proc = rt.exec(command, new String[] {"JAVA_HOME=/usr/lib/jvm/java-11-openjdk"}, workingDirectory);
       processErrorStream = new ProcessStreamReader(proc.getErrorStream(), "ERROR");
       processOutputStream = new ProcessStreamReader(proc.getInputStream(), "OUTPUT");
 
@@ -650,4 +650,40 @@ public class Util {
     out.close();                            
   }
 
+  public static class ProcessStreamReader extends Thread {
+
+    public final static Logger logger = Logger.getLogger(ProcessStreamReader.class);
+
+    InputStream is;
+    String type;
+
+    /**
+     * Constructor.
+     * 
+     * @param is
+     * @param type
+     */
+    ProcessStreamReader(InputStream is, String type) {
+      this.is = is;
+      this.type = type;
+    }
+
+    /**
+     * A method invoked by process execution thread.
+     */
+    public void run() {
+      try {
+        InputStreamReader isr = new InputStreamReader(is);
+        BufferedReader br = new BufferedReader(isr);
+        String line = null;
+        while ((line = br.readLine()) != null) {
+          logger.debug(">> " + line);
+        }
+
+      } catch (IOException ioe) {
+        logger.error(ioe.getMessage());
+        throw new RuntimeException(ioe.getMessage());
+      }
+    }
+  }
 }
