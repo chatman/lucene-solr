@@ -21,9 +21,7 @@ import java.lang.annotation.ElementType;
 import java.lang.annotation.Retention;
 import java.lang.annotation.RetentionPolicy;
 import java.lang.annotation.Target;
-import java.util.Arrays;
 import java.util.HashMap;
-import java.util.HashSet;
 import java.util.Map;
 import java.util.Set;
 import java.util.function.Consumer;
@@ -32,7 +30,7 @@ import org.apache.solr.common.cloud.rule.ImplicitSnitch;
 
 import static java.util.Collections.emptySet;
 import static java.util.Collections.unmodifiableMap;
-import static java.util.Collections.unmodifiableSet;
+
 
 /**
  * A Variable Type used in Autoscaling policy rules. Each variable type may have unique implementation
@@ -214,8 +212,9 @@ public interface Variable {
     @Meta(name = "STRING",
         type = String.class,
         wildCards = Policy.EACH,
-        supportArrayVals = true)
-    STRING,
+        supportArrayVals = true
+    )
+    SYSPROP,
 
     @Meta(name = "node",
         type = String.class,
@@ -238,6 +237,7 @@ public interface Variable {
     DISKTYPE;
 
     public final String tagName;
+    @SuppressWarnings("rawtypes")
     public final Class type;
     public Meta meta;
 
@@ -253,6 +253,7 @@ public interface Variable {
     final Variable impl;
 
 
+    @SuppressWarnings({"unchecked", "rawtypes"})
     Type() {
       try {
         meta = Type.class.getField(name()).getAnnotation(Meta.class);
@@ -276,7 +277,7 @@ public interface Variable {
       this.metricsAttribute = readStr(meta.metricsKey());
       this.supportedComputedTypes = meta.computedValues()[0] == ComputedType.NULL ?
           emptySet() :
-          unmodifiableSet(new HashSet(Arrays.asList(meta.computedValues())));
+          Set.of(meta.computedValues());
       this.wildCards = readSet(meta.wildCards());
 
     }
@@ -296,7 +297,7 @@ public interface Variable {
 
     Set<String> readSet(String[] vals) {
       if (NULL.equals(vals[0])) return emptySet();
-      return unmodifiableSet(new HashSet<>(Arrays.asList(vals)));
+      return Set.of(vals);
     }
 
     @Override
@@ -376,6 +377,7 @@ public interface Variable {
   @interface Meta {
     String name();
 
+    @SuppressWarnings("rawtypes")
     Class type();
 
     String[] associatedPerNodeValue() default NULL;
@@ -400,6 +402,7 @@ public interface Variable {
 
     String metricsKey() default NULL;
 
+    @SuppressWarnings("rawtypes")
     Class implementation() default void.class;
 
     ComputedType[] computedValues() default ComputedType.NULL;

@@ -58,10 +58,14 @@ public class TestContentStreamDataSource extends AbstractDataImportHandlerTestCa
   @Override
   @After
   public void tearDown() throws Exception {
-    jetty.stop();
+    if (null != jetty) {
+      jetty.stop();
+      jetty = null;
+    }
     super.tearDown();
   }
 
+  @SuppressWarnings("rawtypes")
   @Test
   public void testSimple() throws Exception {
     DirectXmlRequest req = new DirectXmlRequest("/dataimport", xml);

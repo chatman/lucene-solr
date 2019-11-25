@@ -33,12 +33,17 @@ import java.util.concurrent.ExecutionException;
 import java.util.concurrent.Future;
 import java.util.concurrent.TimeUnit;
 import java.util.function.Predicate;
+
+import io.opentracing.Span;
+import io.opentracing.Tracer;
+import io.opentracing.propagation.Format;
 import org.apache.solr.client.solrj.SolrRequest;
 import org.apache.solr.client.solrj.SolrResponse;
 import org.apache.solr.client.solrj.SolrServerException;
 import org.apache.solr.client.solrj.impl.BinaryResponseParser;
 import org.apache.solr.client.solrj.impl.Http2SolrClient;
 import org.apache.solr.client.solrj.impl.LBSolrClient;
+import org.apache.solr.client.solrj.routing.ReplicaListTransformer;
 import org.apache.solr.client.solrj.request.QueryRequest;
 import org.apache.solr.client.solrj.util.ClientUtils;
 import org.apache.solr.cloud.CloudDescriptor;
@@ -60,6 +65,8 @@ import org.apache.solr.common.util.StrUtils;
 import org.apache.solr.core.CoreDescriptor;
 import org.apache.solr.request.SolrQueryRequest;
 import org.apache.solr.request.SolrRequestInfo;
+import org.apache.solr.util.tracing.GlobalTracer;
+import org.apache.solr.util.tracing.SolrRequestCarrier;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.slf4j.MDC;
@@ -147,6 +154,8 @@ public class HttpShardHandler extends ShardHandler {
   public void submit(final ShardRequest sreq, final String shard, final ModifiableSolrParams params) {
     // do this outside of the callable for thread safety reasons
     final List<String> urls = getURLs(shard);
+    final Tracer tracer = GlobalTracer.getTracer();
+    final Span span = tracer != null? tracer.activeSpan() : null;
 
     Callable<ShardResponse> task = () -> {
 
@@ -165,6 +174,9 @@ public class HttpShardHandler extends ShardHandler {
         params.remove(CommonParams.VERSION);
 
         QueryRequest req = makeQueryRequest(sreq, params, shard);
+        if (tracer != null && span != null) {
+          tracer.inject(span.context(), Format.Builtin.HTTP_HEADERS, new SolrRequestCarrier(req));
+        }
         req.setMethod(SolrRequest.METHOD.POST);
         SolrRequestInfo requestInfo = SolrRequestInfo.getRequestInfo();
         if (requestInfo != null) req.setUserPrincipal(requestInfo.getReq().getUserPrincipal());

@@ -19,13 +19,13 @@ package org.apache.solr.cloud;
 import java.io.Closeable;
 import java.io.IOException;
 import java.lang.invoke.MethodHandles;
+import java.nio.file.Paths;
 import java.util.ArrayList;
 import java.util.EnumSet;
 import java.util.List;
 import java.util.concurrent.Future;
 import java.util.concurrent.TimeUnit;
 
-import org.apache.hadoop.fs.Path;
 import org.apache.lucene.search.MatchAllDocsQuery;
 import org.apache.solr.cloud.overseer.OverseerAction;
 import org.apache.solr.common.SolrException;
@@ -52,6 +52,7 @@ import org.apache.zookeeper.CreateMode;
 import org.apache.zookeeper.KeeperException;
 import org.apache.zookeeper.KeeperException.NoNodeException;
 import org.apache.zookeeper.KeeperException.NodeExistsException;
+import org.apache.zookeeper.KeeperException.SessionExpiredException;
 import org.apache.zookeeper.Op;
 import org.apache.zookeeper.OpResult;
 import org.apache.zookeeper.OpResult.SetDataResult;
@@ -136,7 +137,7 @@ class ShardLeaderElectionContextBase extends ElectionContext {
     this.shardId = shardId;
     this.collection = collection;
     
-    String parent = new Path(leaderPath).getParent().toString();
+    String parent = Paths.get(leaderPath).getParent().toString();
     ZkCmdExecutor zcmd = new ZkCmdExecutor(30000);
     // only if /collections/{collection} exists already do we succeed in creating this path
     log.info("make sure parent is created {}", parent);
@@ -162,7 +163,7 @@ class ShardLeaderElectionContextBase extends ElectionContext {
           // version whenever a leader registers.
           log.debug("Removing leader registration node on cancel: {} {}", leaderPath, leaderZkNodeParentVersion);
           List<Op> ops = new ArrayList<>(2);
-          ops.add(Op.check(new Path(leaderPath).getParent().toString(), leaderZkNodeParentVersion));
+          ops.add(Op.check(Paths.get(leaderPath).getParent().toString(), leaderZkNodeParentVersion));
           ops.add(Op.delete(leaderPath, -1));
           zkClient.multi(ops, true);
         } catch (KeeperException.NoNodeException nne) {
@@ -188,7 +189,7 @@ class ShardLeaderElectionContextBase extends ElectionContext {
       throws KeeperException, InterruptedException, IOException {
     // register as leader - if an ephemeral is already there, wait to see if it goes away
 
-    String parent = new Path(leaderPath).getParent().toString();
+    String parent = Paths.get(leaderPath).getParent().toString();
     try {
       RetryUtil.retryOnThrowable(NodeExistsException.class, 60000, 5000, () -> {
         synchronized (lock) {
@@ -489,6 +490,9 @@ final class ShardLeaderElectionContext extends ShardLeaderElectionContextBase {
           // we made it as leader - send any recovery requests we need to
           syncStrategy.requestRecoveries();
 
+        } catch (SessionExpiredException e) {
+          throw new SolrException(ErrorCode.SERVER_ERROR,
+              "ZK session expired - cancelling election for " + collection + " " + shardId);
         } catch (Exception e) {
           isLeader = false;
           SolrException.log(log, "There was a problem trying to register as the leader", e);
@@ -503,7 +507,12 @@ final class ShardLeaderElectionContext extends ShardLeaderElectionContextBase {
             core.getCoreDescriptor().getCloudDescriptor().setLeader(false);
             
             // we could not publish ourselves as leader - try and rejoin election
-            rejoinLeaderElection(core);
+            try {
+              rejoinLeaderElection(core);
+            } catch (SessionExpiredException exc) {
+              throw new SolrException(ErrorCode.SERVER_ERROR,
+                  "ZK session expired - cancelling election for " + collection + " " + shardId);
+            }
           }
         }
       } else {
@@ -719,6 +728,9 @@ final class OverseerElectionContext extends ElectionContext {
   @Override
   void runLeaderProcess(boolean weAreReplacement, int pauseBeforeStartMs) throws KeeperException,
       InterruptedException {
+    if (isClosed) {
+      return;
+    }
     log.info("I am going to be the leader {}", id);
     final String id = leaderSeqPath
         .substring(leaderSeqPath.lastIndexOf("/") + 1);

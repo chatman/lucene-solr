@@ -25,7 +25,8 @@ import org.apache.solr.analytics.ExpressionFactory;
 import org.junit.Test;
 
 public class DateFieldsTest extends AbstractAnalyticsFieldTest {
-  
+
+  @SuppressWarnings("deprecation")
   @Test
   public void expressionFactoryCreationTest() {
     ExpressionFactory fact = getExpressionFactory();
@@ -40,7 +41,7 @@ public class DateFieldsTest extends AbstractAnalyticsFieldTest {
   public void singleValuedTrieDateTest() throws IOException {
     DateField valueField = new DateField("date_dt_t");
     Map<String,Long> values = new HashMap<>();
-    
+
     Set<String> missing = collectFieldValues(valueField, id -> {
       long value = valueField.getLong();
       if (valueField.exists()) {
@@ -48,7 +49,7 @@ public class DateFieldsTest extends AbstractAnalyticsFieldTest {
       }
       return valueField.exists();
     });
-    
+
     checkSingleFieldValues(singleDates, values, missing);
   }
 
@@ -56,7 +57,7 @@ public class DateFieldsTest extends AbstractAnalyticsFieldTest {
   public void singleValuedPointDateTest() throws IOException {
     DateField valueField = new DateField("date_dt_p");
     Map<String,Long> values = new HashMap<>();
-    
+
     Set<String> missing = collectFieldValues(valueField, id -> {
       long value = valueField.getLong();
       if (valueField.exists()) {
@@ -64,15 +65,16 @@ public class DateFieldsTest extends AbstractAnalyticsFieldTest {
       }
       return valueField.exists();
     });
-    
+
     checkSingleFieldValues(singleDates, values, missing);
   }
 
+  @SuppressWarnings("deprecation")
   @Test
   public void multiValuedTrieDateTest() throws IOException {
     DateMultiTrieField valueField = new DateMultiTrieField("date_dtm_t");
     Map<String,Map<Long,Integer>> values = new HashMap<>();
-    
+
     Set<String> missing = collectFieldValues(valueField, id -> {
       Map<Long, Integer> doc = new HashMap<>();
       valueField.streamLongs( value -> {
@@ -83,7 +85,7 @@ public class DateFieldsTest extends AbstractAnalyticsFieldTest {
       }
       return doc.size() > 0;
     });
-    
+
     checkMultiFieldValues(multiDates, values, missing, true);
   }
 
@@ -91,7 +93,7 @@ public class DateFieldsTest extends AbstractAnalyticsFieldTest {
   public void multiValuedPointDateTest() throws IOException {
     DateMultiPointField valueField = new DateMultiPointField("date_dtm_p");
     Map<String,Map<Long,Integer>> values = new HashMap<>();
-    
+
     Set<String> missing = collectFieldValues(valueField, id -> {
       Map<Long, Integer> doc = new HashMap<>();
       valueField.streamLongs( value -> {
@@ -102,7 +104,7 @@ public class DateFieldsTest extends AbstractAnalyticsFieldTest {
       }
       return doc.size() > 0;
     });
-    
+
     checkMultiFieldValues(multiDates, values, missing, false);
   }
 }

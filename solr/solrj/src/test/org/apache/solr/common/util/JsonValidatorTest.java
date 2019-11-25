@@ -76,19 +76,17 @@ public class JsonValidatorTest extends SolrTestCaseJ4  {
 
     errs = validator.validateJson(Utils.fromJSONString("{name:x, age:'x21', adult:'true'}"));
     assertEquals(1, errs.size());
-    try {
-      validator = new JsonSchemaValidator("{" +
+    Exception e = expectThrows(Exception.class, () -> {
+      new JsonSchemaValidator("{" +
           "  type:object," +
           "  properties: {" +
           "   age : {type: int}," +
           "   adult : {type: Boolean}," +
           "   name: {type: string}}}");
-      fail("should have failed");
-    } catch (Exception e) {
-      assertTrue(e.getMessage().contains("Unknown type"));
-    }
+    });
+    assertTrue(e.getMessage().contains("Unknown type"));
 
-    try {
+    e = expectThrows(Exception.class, () -> {
       new JsonSchemaValidator("{" +
           "  type:object," +
           "   x : y," +
@@ -96,21 +94,18 @@ public class JsonValidatorTest extends SolrTestCaseJ4  {
           "   age : {type: number}," +
           "   adult : {type: boolean}," +
           "   name: {type: string}}}");
-      fail("should have failed");
-    } catch (Exception e) {
-      assertTrue(e.getMessage().contains("Unknown key"));
-    }
-    try {
+    });
+    assertTrue(e.getMessage().contains("Unknown key"));
+
+    e = expectThrows(Exception.class, () -> {
       new JsonSchemaValidator("{" +
           "  type:object," +
           "  propertes: {" +
           "   age : {type: number}," +
           "   adult : {type: boolean}," +
           "   name: {type: string}}}");
-      fail("should have failed");
-    } catch (Exception e) {
-      assertTrue(e.getMessage().contains("Unknown key : propertes"));
-    }
+    });
+    assertTrue(e.getMessage().contains("Unknown key : propertes"));
 
     validator = new JsonSchemaValidator("{" +
         "  type:object," +
@@ -184,6 +179,7 @@ public class JsonValidatorTest extends SolrTestCaseJ4  {
     assertNull(object);
   }
 
+  @SuppressWarnings("rawtypes")
   private void checkSchema(String name) {
     ValidatingJsonMap spec = Utils.getSpec(name).getSpec();
     Map commands = (Map) spec.get("commands");

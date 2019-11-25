@@ -37,8 +37,9 @@ import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.atomic.AtomicLong;
 import java.util.function.BiConsumer;
 import java.util.function.Function;
+import java.util.function.Predicate;
 
-import org.apache.solr.common.ConditionalMapWriter;
+import org.apache.solr.common.ConditionalKeyMapWriter;
 import org.apache.solr.common.EnumFieldValue;
 import org.apache.solr.common.IteratorWriter;
 import org.apache.solr.common.IteratorWriter.ItemWriter;
@@ -49,6 +50,7 @@ import org.apache.solr.common.SolrDocument;
 import org.apache.solr.common.SolrDocumentList;
 import org.apache.solr.common.SolrInputDocument;
 import org.apache.solr.common.SolrInputField;
+import org.apache.solr.common.params.CommonParams;
 import org.noggit.CharArr;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -70,6 +72,7 @@ import static org.apache.solr.common.util.ByteArrayUtf8CharSequence.convertCharS
  * <p>
  * NOTE -- {@link JavaBinCodec} instances cannot be reused for more than one marshall or unmarshall operation.
  */
+@SuppressWarnings("unchecked")
 public class JavaBinCodec implements PushWriter {
 
   private static final Logger log = LoggerFactory.getLogger(MethodHandles.lookup().lookupClass());
@@ -100,6 +103,7 @@ public class JavaBinCodec implements PushWriter {
           MAP_ENTRY_ITER = 17,
           ENUM_FIELD_VALUE = 18,
           MAP_ENTRY = 19,
+          UUID = 20, // This is reserved to be used only in LogCodec
           // types that combine tag + length (or other info) in a single byte
           TAG_AND_LEN = (byte) (1 << 5),
           STR = (byte) (1 << 5),
@@ -530,7 +534,7 @@ public class JavaBinCodec implements PushWriter {
   //use this to ignore the writable interface because , child docs will ignore the fl flag
   // is it a good design?
   private boolean ignoreWritable =false;
-  private ConditionalMapWriter.EntryWriterWrapper cew;
+  private MapWriter.EntryWriter cew;
 
   public void writeSolrDocument(SolrDocument doc) throws IOException {
     List<SolrDocument> children = doc.getChildDocuments();
@@ -545,7 +549,7 @@ public class JavaBinCodec implements PushWriter {
     int sz = fieldsCount + (children==null ? 0 : children.size());
     writeTag(SOLRDOC);
     writeTag(ORDERED_MAP, sz);
-    if (cew == null) cew = new ConditionalMapWriter.EntryWriterWrapper(ew, (k, o) -> toWrite(k.toString()));
+    if (cew == null) cew = new ConditionalKeyMapWriter.EntryWriterWrapper(ew, (k) -> toWrite(k.toString()));
     doc.writeMap(cew);
     if (children != null) {
       try {
@@ -648,13 +652,14 @@ public class JavaBinCodec implements PushWriter {
   protected SolrInputDocument createSolrInputDocument(int sz) {
     return new SolrInputDocument(new LinkedHashMap<>(sz));
   }
+  static final Predicate<CharSequence> IGNORECHILDDOCS = it -> !CommonParams.CHILDDOC.equals(it.toString());
 
   public void writeSolrInputDocument(SolrInputDocument sdoc) throws IOException {
     List<SolrInputDocument> children = sdoc.getChildDocuments();
     int sz = sdoc.size() + (children==null ? 0 : children.size());
     writeTag(SOLRINPUTDOC, sz);
     writeFloat(1f); // document boost
-    sdoc.writeMap(ew);
+    sdoc.writeMap(new ConditionalKeyMapWriter.EntryWriterWrapper(ew,IGNORECHILDDOCS));
     if (children != null) {
       for (SolrInputDocument child : children) {
         writeSolrInputDocument(child);

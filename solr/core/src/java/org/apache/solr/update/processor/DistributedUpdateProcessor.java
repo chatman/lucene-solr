@@ -23,6 +23,8 @@ import java.util.Set;
 import java.util.concurrent.TimeUnit;
 
 import com.google.common.annotations.VisibleForTesting;
+import org.apache.lucene.index.Term;
+import org.apache.lucene.search.TermQuery;
 import org.apache.lucene.util.BytesRef;
 import org.apache.lucene.util.CharsRefBuilder;
 import org.apache.solr.client.solrj.SolrRequest;
@@ -668,18 +670,19 @@ public class DistributedUpdateProcessor extends UpdateRequestProcessor {
     
     // full (non-inplace) atomic update
     SolrInputDocument sdoc = cmd.getSolrInputDocument();
-    BytesRef id = cmd.getIndexedId();
-    SolrInputDocument oldRootDocWithChildren = RealTimeGetComponent.getInputDocument(cmd.getReq().getCore(), id, RealTimeGetComponent.Resolution.ROOT_WITH_CHILDREN);
+    BytesRef idBytes = cmd.getIndexedId();
+    String idString = cmd.getPrintableId();
+    SolrInputDocument oldRootDocWithChildren = RealTimeGetComponent.getInputDocument(cmd.getReq().getCore(), idBytes, RealTimeGetComponent.Resolution.ROOT_WITH_CHILDREN);
 
     if (oldRootDocWithChildren == null) {
       if (versionOnUpdate > 0) {
         // could just let the optimistic locking throw the error
-        throw new SolrException(ErrorCode.CONFLICT, "Document not found for update.  id=" + cmd.getPrintableId());
+        throw new SolrException(ErrorCode.CONFLICT, "Document not found for update.  id=" + idString);
       } else if (req.getParams().get(ShardParams._ROUTE_) != null) {
         // the specified document could not be found in this shard
         // and was explicitly routed using _route_
         throw new SolrException(ErrorCode.BAD_REQUEST,
-            "Could not find document " + idField.getName() + ":" + id +
+            "Could not find document id=" + idString +
                 ", perhaps the wrong \"_route_\" param was supplied");
       }
     } else {
@@ -692,12 +695,19 @@ public class DistributedUpdateProcessor extends UpdateRequestProcessor {
       // create a new doc by default if an old one wasn't found
       mergedDoc = docMerger.merge(sdoc, new SolrInputDocument());
     } else {
-      if(req.getSchema().savesChildDocRelations() &&
-          !sdoc.getField(idField.getName()).getFirstValue().toString()
-              .equals((String) oldRootDocWithChildren.getFieldValue(IndexSchema.ROOT_FIELD_NAME))) {
+      // Safety check: don't allow an update to an existing doc that has children, unless we actually support this.
+      if (req.getSchema().isUsableForChildDocs() // however, next line we see it doesn't support child docs
+          && req.getSchema().supportsPartialUpdatesOfChildDocs() == false
+          && req.getSearcher().count(new TermQuery(new Term(IndexSchema.ROOT_FIELD_NAME, idBytes))) > 1) {
+        throw new SolrException(ErrorCode.BAD_REQUEST, "This schema does not support partial updates to nested docs. See ref guide.");
+      }
+
+      String oldRootDocRootFieldVal = (String) oldRootDocWithChildren.getFieldValue(IndexSchema.ROOT_FIELD_NAME);
+      if(req.getSchema().savesChildDocRelations() && oldRootDocRootFieldVal != null &&
+          !idString.equals(oldRootDocRootFieldVal)) {
         // this is an update where the updated doc is not the root document
         SolrInputDocument sdocWithChildren = RealTimeGetComponent.getInputDocument(cmd.getReq().getCore(),
-            id, RealTimeGetComponent.Resolution.DOC_WITH_CHILDREN);
+            idBytes, RealTimeGetComponent.Resolution.DOC_WITH_CHILDREN);
         mergedDoc = docMerger.mergeChildDoc(sdoc, oldRootDocWithChildren, sdocWithChildren);
       } else {
         mergedDoc = docMerger.merge(sdoc, oldRootDocWithChildren);
@@ -1079,15 +1089,17 @@ public class DistributedUpdateProcessor extends UpdateRequestProcessor {
   }
 
   @Override
-  public void finish() throws IOException {
-    assertNotFinished();
+  public final void finish() throws IOException {
+    assert ! finished : "lifecycle sanity check";
+    finished = true;
+
+    doDistribFinish();
 
     super.finish();
   }
 
-  protected void assertNotFinished() {
-    assert ! finished : "lifecycle sanity check";
-    finished = true;
+  protected void doDistribFinish() throws IOException {
+    // no-op for derived classes to implement
   }
 
   /**

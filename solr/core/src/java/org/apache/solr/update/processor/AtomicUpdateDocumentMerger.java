@@ -16,8 +16,6 @@
  */
 package org.apache.solr.update.processor;
 
-import static org.apache.solr.common.params.CommonParams.ID;
-
 import java.io.IOException;
 import java.lang.invoke.MethodHandles;
 import java.util.ArrayList;
@@ -58,6 +56,8 @@ import org.apache.solr.update.AddUpdateCommand;
 import org.apache.solr.util.RefCounted;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+
+import static org.apache.solr.common.params.CommonParams.ID;
 
 /**
  * @lucene.experimental
@@ -194,9 +194,16 @@ public class AtomicUpdateDocumentMerger {
         return Collections.emptySet();
       }
       // else it's a atomic update map...
-      for (String op : ((Map<String, Object>)fieldValue).keySet()) {
+      Map<String, Object> fieldValueMap = (Map<String, Object>)fieldValue;
+      for (Entry<String, Object> entry : fieldValueMap.entrySet()) {
+        String op = entry.getKey();
+        Object obj = entry.getValue();
         if (!op.equals("set") && !op.equals("inc")) {
           // not a supported in-place update op
+          return Collections.emptySet();
+        } else if (op.equals("set") && (obj == null || (obj instanceof Collection && ((Collection) obj).isEmpty()))) {
+          // when operation is set and value is either null or empty list
+          // treat the update as atomic instead of inplace
           return Collections.emptySet();
         }
         // fail fast if child doc
@@ -230,19 +237,14 @@ public class AtomicUpdateDocumentMerger {
     // third pass: requiring checks against the actual IndexWriter due to internal DV update limitations
     SolrCore core = cmd.getReq().getCore();
     RefCounted<IndexWriter> holder = core.getSolrCoreState().getIndexWriter(core);
-    Set<String> fieldNamesFromIndexWriter = null;
     Set<String> segmentSortingFields = null;
     try {
       IndexWriter iw = holder.get();
-      fieldNamesFromIndexWriter = iw.getFieldNames(); // This shouldn't be needed once LUCENE-7659 is resolved
       segmentSortingFields = iw.getConfig().getIndexSortFields();
     } finally {
       holder.decref();
     }
     for (String fieldName: candidateFields) {
-      if (! fieldNamesFromIndexWriter.contains(fieldName) ) {
-        return Collections.emptySet(); // if this field doesn't exist, DV update can't work
-      }
       if (segmentSortingFields.contains(fieldName) ) {
         return Collections.emptySet(); // if this is used for segment sorting, DV updates can't work
       }
@@ -539,9 +541,9 @@ public class AtomicUpdateDocumentMerger {
   private Collection<Pattern> preparePatterns(Object fieldVal) {
     final Collection<Pattern> patterns = new LinkedHashSet<>(1);
     if (fieldVal instanceof Collection) {
-      Collection<String> patternVals = (Collection<String>) fieldVal;
-      for (String patternVal : patternVals) {
-        patterns.add(Pattern.compile(patternVal));
+      Collection<Object> patternVals = (Collection<Object>) fieldVal;
+      for (Object patternVal : patternVals) {
+        patterns.add(Pattern.compile(patternVal.toString()));
       }
     } else {
       patterns.add(Pattern.compile(fieldVal.toString()));

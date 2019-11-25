@@ -25,7 +25,8 @@ import org.apache.solr.analytics.ExpressionFactory;
 import org.junit.Test;
 
 public class IntFieldsTest extends AbstractAnalyticsFieldTest {
-  
+
+  @SuppressWarnings("deprecation")
   @Test
   public void expressionFactoryCreationTest() {
     ExpressionFactory fact = getExpressionFactory();
@@ -40,7 +41,7 @@ public class IntFieldsTest extends AbstractAnalyticsFieldTest {
   public void singleValuedTrieIntTest() throws IOException {
     IntField valueField = new IntField("int_i_t");
     Map<String,Integer> values = new HashMap<>();
-    
+
     Set<String> missing = collectFieldValues(valueField, id -> {
       int value = valueField.getInt();
       if (valueField.exists()) {
@@ -48,7 +49,7 @@ public class IntFieldsTest extends AbstractAnalyticsFieldTest {
       }
       return valueField.exists();
     });
-    
+
     checkSingleFieldValues(singleInts, values, missing);
   }
 
@@ -56,7 +57,7 @@ public class IntFieldsTest extends AbstractAnalyticsFieldTest {
   public void singleValuedPointIntTest() throws IOException {
     IntField valueField = new IntField("int_i_p");
     Map<String,Integer> values = new HashMap<>();
-    
+
     Set<String> missing = collectFieldValues(valueField, id -> {
       int value = valueField.getInt();
       if (valueField.exists()) {
@@ -64,15 +65,16 @@ public class IntFieldsTest extends AbstractAnalyticsFieldTest {
       }
       return valueField.exists();
     });
-    
+
     checkSingleFieldValues(singleInts, values, missing);
   }
 
+  @SuppressWarnings("deprecation")
   @Test
   public void multiValuedTrieIntTest() throws IOException {
     IntMultiTrieField valueField = new IntMultiTrieField("int_im_t");
     Map<String,Map<Integer,Integer>> values = new HashMap<>();
-    
+
     Set<String> missing = collectFieldValues(valueField, id -> {
       Map<Integer, Integer> doc = new HashMap<>();
       valueField.streamInts( value -> {
@@ -83,7 +85,7 @@ public class IntFieldsTest extends AbstractAnalyticsFieldTest {
       }
       return doc.size() > 0;
     });
-    
+
     checkMultiFieldValues(multiInts, values, missing, true);
   }
 
@@ -91,7 +93,7 @@ public class IntFieldsTest extends AbstractAnalyticsFieldTest {
   public void multiValuedPointIntTest() throws IOException {
     IntMultiPointField valueField = new IntMultiPointField("int_im_p");
     Map<String,Map<Integer,Integer>> values = new HashMap<>();
-    
+
     Set<String> missing = collectFieldValues(valueField, id -> {
       Map<Integer, Integer> doc = new HashMap<>();
       valueField.streamInts( value -> {
@@ -102,7 +104,7 @@ public class IntFieldsTest extends AbstractAnalyticsFieldTest {
       }
       return doc.size() > 0;
     });
-    
+
     checkMultiFieldValues(multiInts, values, missing, false);
   }
 }

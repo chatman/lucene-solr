@@ -135,7 +135,25 @@
   <property name="tests.asserts" value="true" />
   <property name="tests.policy" location="${common.dir}/tools/junit4/tests.policy"/>
 
-  <condition property="tests.asserts.args" value="-ea -esa" else="">
+  <condition property="tests.asserts.bug.jdk8205399" value="-da:java.util.HashMap" else="">
+    <!-- LUCENE-8991 / JDK-8205399: HashMap assertion bug until java12-->
+    <and>
+      <or>
+        <contains string="${java.vm.name}" substring="hotspot" casesensitive="false"/>
+        <contains string="${java.vm.name}" substring="openjdk" casesensitive="false"/>
+        <contains string="${java.vm.name}" substring="jrockit" casesensitive="false"/>
+      </or>
+      <or>
+        <equals arg1="${java.specification.version}" arg2="1.8"/>
+        <equals arg1="${java.specification.version}" arg2="9"/>
+        <equals arg1="${java.specification.version}" arg2="10"/>
+        <equals arg1="${java.specification.version}" arg2="11"/>
+      </or>
+      <isfalse value="${tests.asserts.hashmap}" />
+    </and>
+  </condition>
+  
+  <condition property="tests.asserts.args" value="-ea -esa ${tests.asserts.bug.jdk8205399}" else="">
     <istrue value="${tests.asserts}"/>
   </condition>
 
@@ -172,7 +190,7 @@
   <property name="javac.release" value="11"/>
   <property name="javac.args" value="-Xlint -Xlint:-deprecation -Xlint:-serial"/>
   <property name="javadoc.link" value="https://docs.oracle.com/en/java/javase/11/docs/api/"/>
-  <property name="javadoc.link.junit" value="http://junit.sourceforge.net/javadoc/"/>
+  <property name="javadoc.link.junit" value="https://junit.org/junit4/javadoc/4.12/"/>
   <property name="javadoc.packagelist.dir" location="${common.dir}/tools/javadoc"/>
   <available file="${javadoc.packagelist.dir}/java11/package-list" property="javadoc.java11.packagelist.exists"/>
   <property name="javadoc.access" value="protected"/>
@@ -397,9 +415,8 @@
   </target>
 
   <property name="ivy_install_path" location="${user.home}/.ant/lib" />
-  <property name="ivy_bootstrap_url1" value="http://repo1.maven.org/maven2"/>
-  <!-- you might need to tweak this from china so it works -->
-  <property name="ivy_bootstrap_url2" value="http://uk.maven.org/maven2"/>
+  <property name="ivy_bootstrap_url1" value="https://repo1.maven.org/maven2"/>
+  <property name="ivy_bootstrap_url2" value="https://repo2.maven.org/maven2"/>
   <property name="ivy_checksum_sha1" value="5abe4c24bbe992a9ac07ca563d5bd3e8d569e9ed"/>
 
   <target name="ivy-availability-check" unless="ivy.available">
@@ -2019,7 +2036,7 @@ ${ant.project.name}.test.dependencies=${test.classpath.list}
   </target>
   
   <target name="-ecj-resolve" unless="ecj.loaded" depends="ivy-availability-check,ivy-configure" if="ecj-javadoc-lint.supported">
-    <ivy:cachepath organisation="org.eclipse.jdt" module="ecj" revision="3.17.0"
+    <ivy:cachepath organisation="org.eclipse.jdt" module="ecj" revision="3.19.0"
      inline="true" conf="master" type="jar" pathid="ecj.classpath" />
     <componentdef classname="org.eclipse.jdt.core.JDTCompilerAdapter"
      classpathref="ecj.classpath" name="ecj-component"/>
@@ -2120,6 +2137,8 @@ ${ant.project.name}.test.dependencies=${test.classpath.list}
           description="WARNING: This API is experimental and might change in incompatible ways in the next release."/>
         <tag name="lucene.internal"
         description="NOTE: This API is for internal purposes only and might change in incompatible ways in the next release."/>
+        <tag name="lucene.spi"
+        description="SPI Name (Note: This is case-insensitive. e.g., if the name is 'htmlStrip', 'htmlstrip' can be used when looking up the service):" scope="types"/>
         <link offline="true" packagelistLoc="${javadoc.dir}"/>
         <link offline="true" href="${javadoc.link}" packagelistLoc="${javadoc.packagelist.dir}/java11"/>
         <bottom><![CDATA[
@@ -2308,7 +2327,7 @@ ${ant.project.name}.test.dependencies=${test.classpath.list}
 
   <!-- GROOVY scripting engine for ANT tasks -->
   <target name="resolve-groovy" unless="groovy.loaded" depends="ivy-availability-check,ivy-configure">
-    <ivy:cachepath organisation="org.codehaus.groovy" module="groovy-all" revision="2.4.16"
+    <ivy:cachepath organisation="org.codehaus.groovy" module="groovy-all" revision="2.4.17"
       inline="true" conf="default" type="jar" transitive="true" pathid="groovy.classpath"/>
     <taskdef name="groovy"
       classname="org.codehaus.groovy.ant.Groovy"
@@ -2322,7 +2341,7 @@ ${ant.project.name}.test.dependencies=${test.classpath.list}
   <property name="forbidden-sysout-excludes" value=""/>
   
   <target name="-install-forbidden-apis" unless="forbidden-apis.loaded" depends="ivy-availability-check,ivy-configure">
-    <ivy:cachepath organisation="de.thetaphi" module="forbiddenapis" revision="2.6"
+    <ivy:cachepath organisation="de.thetaphi" module="forbiddenapis" revision="2.7"
       inline="true" conf="default" transitive="true" pathid="forbidden-apis.classpath"/>
     <taskdef name="forbidden-apis" classname="de.thetaphi.forbiddenapis.ant.AntTask" classpathref="forbidden-apis.classpath"/>
     <property name="forbidden-apis.loaded" value="true"/>

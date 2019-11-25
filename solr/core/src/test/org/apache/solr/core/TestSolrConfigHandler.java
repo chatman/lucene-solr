@@ -139,7 +139,7 @@ public class TestSolrConfigHandler extends RestTestBase {
     assertEquals("10", m._getStr("config/updateHandler/autoCommit/maxTime",null));
     assertEquals("true", m._getStr("config/requestDispatcher/requestParsers/addHttpRequestToContext",null));
     payload = "{\n" +
-        " 'unset-property' :  'updateHandler.autoCommit.maxDocs'} \n" +
+        " 'unset-property' :  'updateHandler.autoCommit.maxDocs' \n" +
         " }";
     runConfigCommand(harness, "/config", payload);
 
@@ -171,13 +171,14 @@ public class TestSolrConfigHandler extends RestTestBase {
     reqhandlertests(restTestHarness, null, null);
   }
 
-  public static void runConfigCommand(RestTestHarness harness, String uri, String payload) throws IOException {
+  public static Map runConfigCommand(RestTestHarness harness, String uri, String payload) throws IOException {
     String json = SolrTestCaseJ4.json(payload);
     log.info("going to send config command. path {} , payload: {}", uri, payload);
     String response = harness.post(uri, json);
     Map map = (Map) Utils.fromJSONString(response);
     assertNull(response, map.get("errorMessages"));
     assertNull(response, map.get("errors")); // Will this ever be returned?
+    return map;
   }
 
   public static void runConfigCommandExpectFailure(RestTestHarness harness, String uri, String payload, String expectedErrorMessage) throws Exception {
@@ -489,8 +490,8 @@ public class TestSolrConfigHandler extends RestTestBase {
         TIMEOUT_S);
 
     payload = "{\n" +
-        "'add-cache' : {name:'lfuCacheDecayFalse', class:'solr.search.LFUCache', size:10 ,initialSize:9 , timeDecay:false }," +
-        "'add-cache' : {name: 'perSegFilter', class: 'solr.search.LRUCache', size:10, initialSize:0 , autowarmCount:10}}";
+        "'add-cache' : {name:'lfuCacheDecayFalse', class:'solr.search.CaffeineCache', size:10 ,initialSize:9 , timeDecay:false }," +
+        "'add-cache' : {name: 'perSegFilter', class: 'solr.search.CaffeineCache', size:10, initialSize:0 , autowarmCount:10}}";
     runConfigCommand(writeHarness, "/config", payload);
 
     map = testForResponseElement(writeHarness,
@@ -498,13 +499,13 @@ public class TestSolrConfigHandler extends RestTestBase {
         "/config/overlay",
         cloudSolrClient,
         asList("overlay", "cache", "lfuCacheDecayFalse", "class"),
-        "solr.search.LFUCache",
+        "solr.search.CaffeineCache",
         TIMEOUT_S);
-    assertEquals("solr.search.LRUCache",getObjectByPath(map, true, ImmutableList.of("overlay", "cache", "perSegFilter", "class")));
+    assertEquals("solr.search.CaffeineCache",getObjectByPath(map, true, ImmutableList.of("overlay", "cache", "perSegFilter", "class")));
 
     map = getRespMap("/dump101?cacheNames=lfuCacheDecayFalse&cacheNames=perSegFilter", writeHarness);
-    assertEquals("Actual output "+ Utils.toJSONString(map), "org.apache.solr.search.LRUCache",getObjectByPath(map, true, ImmutableList.of( "caches", "perSegFilter")));
-    assertEquals("Actual output "+ Utils.toJSONString(map), "org.apache.solr.search.LFUCache",getObjectByPath(map, true, ImmutableList.of( "caches", "lfuCacheDecayFalse")));
+    assertEquals("Actual output "+ Utils.toJSONString(map), "org.apache.solr.search.CaffeineCache",getObjectByPath(map, true, ImmutableList.of( "caches", "perSegFilter")));
+    assertEquals("Actual output "+ Utils.toJSONString(map), "org.apache.solr.search.CaffeineCache",getObjectByPath(map, true, ImmutableList.of( "caches", "lfuCacheDecayFalse")));
 
   }
   

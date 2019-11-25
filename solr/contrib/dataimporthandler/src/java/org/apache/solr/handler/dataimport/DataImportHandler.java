@@ -36,7 +36,7 @@ import org.apache.solr.core.SolrCore;
 import org.apache.solr.core.SolrResourceLoader;
 import org.apache.solr.handler.RequestHandlerBase;
 import org.apache.solr.metrics.MetricsMap;
-import org.apache.solr.metrics.SolrMetricManager;
+import org.apache.solr.metrics.SolrMetricsContext;
 import org.apache.solr.request.SolrQueryRequest;
 import org.apache.solr.response.RawResponseWriter;
 import org.apache.solr.response.SolrQueryResponse;
@@ -65,6 +65,7 @@ import static org.apache.solr.handler.dataimport.DataImporter.IMPORT_CMD;
  *
  * @since solr 1.3
  */
+@SuppressWarnings({"rawtypes", "unchecked"})
 public class DataImportHandler extends RequestHandlerBase implements
         SolrCoreAware {
 
@@ -80,13 +81,15 @@ public class DataImportHandler extends RequestHandlerBase implements
 
   private static final String PARAM_WRITER_IMPL = "writerImpl";
   private static final String DEFAULT_WRITER_NAME = "SolrWriter";
+  static final String ENABLE_DIH_DATA_CONFIG_PARAM = "enable.dih.dataConfigParam";
+
+  final boolean dataConfigParam_enabled = Boolean.getBoolean(ENABLE_DIH_DATA_CONFIG_PARAM);
 
   public DataImporter getImporter() {
     return this.importer;
   }
 
   @Override
-  @SuppressWarnings("unchecked")
   public void init(NamedList args) {
     super.init(args);
     Map<String,String> macro = new HashMap<>();
@@ -95,7 +98,6 @@ public class DataImportHandler extends RequestHandlerBase implements
   }
 
   @Override
-  @SuppressWarnings("unchecked")
   public void inform(SolrCore core) {
     try {
       String name = getPluginInfo().name;
@@ -113,7 +115,6 @@ public class DataImportHandler extends RequestHandlerBase implements
   }
 
   @Override
-  @SuppressWarnings("unchecked")
   public void handleRequestBody(SolrQueryRequest req, SolrQueryResponse rsp)
           throws Exception {
     rsp.setHttpCaching(false);
@@ -134,7 +135,7 @@ public class DataImportHandler extends RequestHandlerBase implements
     
     if (DataImporter.SHOW_CONF_CMD.equals(command)) {    
       String dataConfigFile = params.get("config");
-      String dataConfig = params.get("dataConfig");
+      String dataConfig = params.get("dataConfig"); // needn't check dataConfigParam_enabled; we don't execute it
       if(dataConfigFile != null) {
         dataConfig = SolrWriter.getResourceAsString(req.getCore().getResourceLoader().openResource(dataConfigFile));
       }
@@ -149,6 +150,12 @@ public class DataImportHandler extends RequestHandlerBase implements
         rsp.add(RawResponseWriter.CONTENT, content);
       }
       return;
+    }
+
+    if (params.get("dataConfig") != null && dataConfigParam_enabled == false) {
+      throw new SolrException(SolrException.ErrorCode.FORBIDDEN,
+          "Use of the dataConfig param (DIH debug mode) requires the system property " +
+              ENABLE_DIH_DATA_CONFIG_PARAM + " because it's a security risk.");
     }
 
     rsp.add("initArgs", initArgs);
@@ -241,7 +248,6 @@ public class DataImportHandler extends RequestHandlerBase implements
         && !writerClassStr.equals(DocBuilder.class.getPackage().getName() + "."
             + DEFAULT_WRITER_NAME)) {
       try {
-        @SuppressWarnings("unchecked")
         Class<DIHWriter> writerClass = DocBuilder.loadClass(writerClassStr, req.getCore());
         Constructor<DIHWriter> cnstr = writerClass.getConstructor(new Class[] {
             UpdateRequestProcessor.class, SolrQueryRequest.class});
@@ -266,8 +272,8 @@ public class DataImportHandler extends RequestHandlerBase implements
   }
 
   @Override
-  public void initializeMetrics(SolrMetricManager manager, String registryName, String tag, String scope) {
-    super.initializeMetrics(manager, registryName, tag, scope);
+  public void initializeMetrics(SolrMetricsContext parentContext, String scope) {
+    super.initializeMetrics(parentContext, scope);
     metrics = new MetricsMap((detailed, map) -> {
       if (importer != null) {
         DocBuilder.Statistics cumulative = importer.cumulativeStatistics;
@@ -290,7 +296,7 @@ public class DataImportHandler extends RequestHandlerBase implements
         map.put(DataImporter.MSG.TOTAL_DOCS_SKIPPED, cumulative.skipDocCount);
       }
     });
-    manager.registerGauge(this, registryName, metrics, tag, true, "importer", getCategory().toString(), scope);
+    solrMetricsContext.gauge(metrics, true, "importer", getCategory().toString(), scope);
   }
 
   // //////////////////////SolrInfoMBeans methods //////////////////////

@@ -66,6 +66,10 @@ public class RandomStream extends TupleStream implements Expressible  {
   protected transient CloudSolrClient cloudSolrClient;
   private Iterator<SolrDocument> documentIterator;
 
+  public RandomStream() {
+    // Used by the RandomFacade
+  }
+
   public RandomStream(String zkHost,
                       String collection,
                      Map<String, String> props) throws IOException {
@@ -116,7 +120,7 @@ public class RandomStream extends TupleStream implements Expressible  {
     init(zkHost, collectionName, params);
   }
 
-  private void init(String zkHost, String collection, Map<String, String> props) throws IOException {
+  void init(String zkHost, String collection, Map<String, String> props) throws IOException {
     this.zkHost  = zkHost;
     this.props   = props;
     this.collection = collection;
@@ -212,8 +216,8 @@ public class RandomStream extends TupleStream implements Expressible  {
     if(documentIterator.hasNext()) {
       Map map = new HashMap();
       SolrDocument doc = documentIterator.next();
-      for(String key  : doc.keySet()) {
-        map.put(key, doc.get(key));
+      for(Entry<String, Object> entry : doc.entrySet()) {
+        map.put(entry.getKey(), entry.getValue());
       }
       return new Tuple(map);
     } else {
@@ -226,9 +230,9 @@ public class RandomStream extends TupleStream implements Expressible  {
 
   private ModifiableSolrParams getParams(Map<String, String> props) {
     ModifiableSolrParams params = new ModifiableSolrParams();
-    for(String key : props.keySet()) {
-      String value = props.get(key);
-      params.add(key, value);
+    for(Entry<String, String> entry : props.entrySet()) {
+      String value = entry.getValue();
+      params.add(entry.getKey(), value);
     }
     return params;
   }

@@ -25,14 +25,14 @@ import org.apache.solr.ltr.FeatureLoggerTestUtils;
 import org.apache.solr.ltr.TestRerankBase;
 import org.apache.solr.ltr.model.LinearModel;
 import org.apache.solr.ltr.model.MultipleAdditiveTreesModel;
-import org.junit.AfterClass;
-import org.junit.BeforeClass;
+import org.junit.After;
+import org.junit.Before;
 import org.junit.Test;
 
 public class TestNoMatchSolrFeature extends TestRerankBase {
 
-  @BeforeClass
-  public static void before() throws Exception {
+  @Before
+  public void before() throws Exception {
     setuptest(false);
 
     assertU(adoc("id", "1", "title", "w1", "description", "w1", "popularity",
@@ -78,11 +78,12 @@ public class TestNoMatchSolrFeature extends TestRerankBase {
         "{\"weights\":{\"nomatchfeature4\":1.0}}");
   }
 
-  @AfterClass
-  public static void after() throws Exception {
+  @After
+  public void after() throws Exception {
     aftertest();
   }
 
+  @SuppressWarnings("unchecked")
   @Test
   public void test2NoMatch1YesMatchFeatureReturnsFvWith1FeatureAndDocScoreScaledByModel() throws Exception {
     // Tests model with all no matching features but 1
@@ -149,6 +150,7 @@ public class TestNoMatchSolrFeature extends TestRerankBase {
     assertJQ("/query" + query.toQueryString(), "/response/docs/[3]/fv=='"+docs3fv_default_csv+"'");
   }
 
+  @SuppressWarnings("unchecked")
   @Test
   public void test1NoMatchFeatureReturnsFvWith1MatchingFeatureFromStoreAndDocWith0Score() throws Exception {
     // Tests model with all no matching features, but 1 feature store feature matching for extraction

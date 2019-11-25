@@ -191,7 +191,11 @@ public abstract class BaseHttpClusterStateProvider implements ClusterStateProvid
 
   @Override
   public List<String> resolveAlias(String aliasName) {
-    return Aliases.resolveAliasesGivenAliasMap(getAliases(false), aliasName);
+    return resolveAlias(aliasName, false);
+  }
+
+  public List<String> resolveAlias(String aliasName, boolean forceFetch) {
+    return Aliases.resolveAliasesGivenAliasMap(getAliases(forceFetch), aliasName);
   }
 
   @Override
@@ -250,6 +254,7 @@ public abstract class BaseHttpClusterStateProvider implements ClusterStateProvid
   }
 
   @Override
+  @SuppressWarnings("deprecation")
   public ClusterState getClusterState() throws IOException {
     for (String nodeName: liveNodes) {
       String baseUrl = Utils.getBaseUrlForNodeName(nodeName, urlScheme);
@@ -271,6 +276,7 @@ public abstract class BaseHttpClusterStateProvider implements ClusterStateProvid
   }
 
   @Override
+  @SuppressWarnings("deprecation")
   public Map<String, Object> getClusterProperties() {
     for (String nodeName : liveNodes) {
       String baseUrl = Utils.getBaseUrlForNodeName(nodeName, urlScheme);

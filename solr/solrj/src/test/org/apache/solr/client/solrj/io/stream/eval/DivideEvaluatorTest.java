@@ -27,7 +27,7 @@ import org.apache.solr.client.solrj.io.eval.StreamEvaluator;
 import org.apache.solr.client.solrj.io.stream.expr.StreamFactory;
 import org.junit.Test;
 
-import junit.framework.Assert;
+import org.junit.Assert;
 
 public class DivideEvaluatorTest extends SolrTestCase {
 
@@ -158,7 +158,6 @@ public class DivideEvaluatorTest extends SolrTestCase {
     values.put("a", 0);
     values.put("b", 2);
     result = evaluator.evaluate(new Tuple(values));
-    Assert.assertTrue(result instanceof Long);
-    Assert.assertEquals(0L, result);
+    Assert.assertEquals(0D, result);
   }
 }

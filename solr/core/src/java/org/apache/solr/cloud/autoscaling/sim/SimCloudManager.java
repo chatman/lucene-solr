@@ -98,6 +98,7 @@ import org.apache.solr.metrics.AltBufferPoolMetricSet;
 import org.apache.solr.metrics.MetricsMap;
 import org.apache.solr.metrics.OperatingSystemMetricSet;
 import org.apache.solr.metrics.SolrMetricManager;
+import org.apache.solr.metrics.SolrMetricsContext;
 import org.apache.solr.request.LocalSolrQueryRequest;
 import org.apache.solr.response.SolrQueryResponse;
 import org.apache.solr.util.DefaultSolrThreadFactory;
@@ -155,7 +156,7 @@ public class SimCloudManager implements SolrCloudManager {
   private boolean useSystemCollection = true;
 
   private static int nodeIdPort = 10000;
-  public static int DEFAULT_FREE_DISK = 1024; // 1000 GiB
+  public static int DEFAULT_FREE_DISK = 10240; // 10 TiB
   public static int DEFAULT_TOTAL_DISK = 10240; // 10 TiB
   public static long DEFAULT_IDX_SIZE_BYTES = 10240; // 10 kiB
 
@@ -382,12 +383,16 @@ public class SimCloudManager implements SolrCloudManager {
     return values;
   }
 
+  public void disableMetricsHistory() {
+    metricsHistoryHandler.close();
+  }
+
   public String dumpClusterState(boolean withCollections) throws Exception {
     StringBuilder sb = new StringBuilder();
     sb.append("#######################################\n");
     sb.append("############ CLUSTER STATE ############\n");
     sb.append("#######################################\n");
-    sb.append("## Live nodes:\t\t" + getLiveNodesSet().size() + "\n");
+    sb.append("## Live nodes:\t\t").append(getLiveNodesSet().size()).append("\n");
     int emptyNodes = 0;
     int maxReplicas = 0;
     int minReplicas = Integer.MAX_VALUE;
@@ -414,37 +419,37 @@ public class SimCloudManager implements SolrCloudManager {
     if (minReplicas == Integer.MAX_VALUE) {
       minReplicas = 0;
     }
-    sb.append("## Empty nodes:\t" + emptyNodes + "\n");
+    sb.append("## Empty nodes:\t").append(emptyNodes).append("\n");
     Set<String> deadNodes = getSimNodeStateProvider().simGetDeadNodes();
-    sb.append("## Dead nodes:\t\t" + deadNodes.size() + "\n");
-    deadNodes.forEach(n -> sb.append("##\t\t" + n + "\n"));
+    sb.append("## Dead nodes:\t\t").append(deadNodes.size()).append("\n");
+    deadNodes.forEach(n -> sb.append("##\t\t").append(n).append("\n"));
     sb.append("## Collections:\n");
       clusterStateProvider.simGetCollectionStats().forEach((coll, stats) -> {
         sb.append("##  * ").append(coll).append('\n');
         stats.forEach((k, v) -> {
-          sb.append("##    " + k + "\t" + v + "\n");
+          sb.append("##    ").append(k).append("\t").append(v).append("\n");
         });
       });
     if (withCollections) {
       ClusterState state = clusterStateProvider.getClusterState();
-      state.forEachCollection(coll -> sb.append(coll.toString() + "\n"));
+      state.forEachCollection(coll -> sb.append(coll.toString()).append("\n"));
     }
-    sb.append("## Max replicas per node:\t" + maxReplicas + "\n");
-    sb.append("## Min replicas per node:\t" + minReplicas + "\n");
-    sb.append("## Total replicas:\t\t" + numReplicas + "\n");
+    sb.append("## Max replicas per node:\t").append(maxReplicas).append("\n");
+    sb.append("## Min replicas per node:\t").append(minReplicas).append("\n");
+    sb.append("## Total replicas:\t\t").append(numReplicas).append("\n");
     replicaStates.forEach((c, map) -> {
       AtomicInteger repCnt = new AtomicInteger();
       map.forEach((s, cnt) -> repCnt.addAndGet(cnt.get()));
-      sb.append("## * " + c + "\t\t" + repCnt.get() + "\n");
-      map.forEach((s, cnt) -> sb.append("##\t\t- " + String.format(Locale.ROOT, "%-12s  %4d", s, cnt.get()) + "\n"));
+      sb.append("## * ").append(c).append("\t\t").append(repCnt.get()).append("\n");
+      map.forEach((s, cnt) -> sb.append("##\t\t- ").append(String.format(Locale.ROOT, "%-12s  %4d", s, cnt.get())).append("\n"));
     });
     sb.append("######### Solr op counts ##########\n");
-    simGetOpCounts().forEach((k, cnt) -> sb.append("##\t\t- " + String.format(Locale.ROOT, "%-14s  %4d", k, cnt.get()) + "\n"));
+    simGetOpCounts().forEach((k, cnt) -> sb.append("##\t\t- ").append(String.format(Locale.ROOT, "%-14s  %4d", k, cnt.get())).append("\n"));
     sb.append("######### Autoscaling event counts ###########\n");
     Map<String, Map<String, AtomicInteger>> counts = simGetEventCounts();
     counts.forEach((trigger, map) -> {
-      sb.append("## * Trigger: " + trigger + "\n");
-      map.forEach((s, cnt) -> sb.append("##\t\t- " + String.format(Locale.ROOT, "%-11s  %4d", s, cnt.get()) + "\n"));
+      sb.append("## * Trigger: ").append(trigger).append("\n");
+      map.forEach((s, cnt) -> sb.append("##\t\t- ").append(String.format(Locale.ROOT, "%-11s  %4d", s, cnt.get())).append("\n"));
     });
     return sb.toString();
   }
@@ -478,7 +483,8 @@ public class SimCloudManager implements SolrCloudManager {
     if (metricsHistoryHandler == null && liveNodesSet.size() == 1) {
       metricsHandler = new MetricsHandler(metricManager);
       metricsHistoryHandler = new MetricsHistoryHandler(nodeId, metricsHandler, solrClient, this, new HashMap<>());
-      metricsHistoryHandler.initializeMetrics(metricManager, SolrMetricManager.getRegistryName(SolrInfoBean.Group.node), metricTag, CommonParams.METRICS_HISTORY_PATH);
+      SolrMetricsContext solrMetricsContext = new SolrMetricsContext(metricManager, SolrMetricManager.getRegistryName(SolrInfoBean.Group.node), metricTag);
+      metricsHistoryHandler.initializeMetrics(solrMetricsContext, CommonParams.METRICS_HISTORY_PATH);
     }
     return nodeId;
   }
@@ -838,11 +844,14 @@ public class SimCloudManager implements SolrCloudManager {
     String a = params != null ? params.get(CoreAdminParams.ACTION) : null;
     SolrResponse rsp = new SolrResponseBase();
     rsp.setResponse(new NamedList<>());
+    String path = params != null ? params.get("path") : null;
     if (!(req instanceof CollectionAdminRequest)) {
       // maybe a V2Request?
       if (req instanceof V2Request) {
         params = SimUtils.v2AdminRequestToV1Params((V2Request)req);
         a = params.get(CoreAdminParams.ACTION);
+      } else if (path != null && (path.startsWith("/admin/") || path.startsWith("/cluster/"))) {
+        // pass it through, it's likely a generic request containing admin params
       } else {
         throw new UnsupportedOperationException("Only some CollectionAdminRequest-s are supported: " + req.getClass().getName() + ": " + req.getPath() + " " + req.getParams());
       }

@@ -61,6 +61,7 @@ import org.apache.solr.common.params.SolrParams;
  * </p>
  *
  */
+@SuppressWarnings("unchecked")
 public class NamedList<T> implements Cloneable, Serializable, Iterable<Map.Entry<String,T>> , MapWriter {
 
   private static final long serialVersionUID = 1957981902839867821L;
@@ -401,7 +402,7 @@ public class NamedList<T> implements Cloneable, Serializable, Iterable<Map.Entry
     sb.append('{');
     int sz = size();
     for (int i=0; i<sz; i++) {
-      if (i != 0) sb.append(',');
+      if (i != 0) sb.append(", ");
       sb.append(getName(i));
       sb.append('=');
       sb.append(getVal(i));
@@ -417,6 +418,9 @@ public class NamedList<T> implements Cloneable, Serializable, Iterable<Map.Entry
   }
 
   public Map<String,T> asShallowMap() {
+    return asShallowMap(false);
+  }
+  public Map<String,T> asShallowMap(boolean allowDps) {
     return new Map<String, T>() {
       @Override
       public int size() {
@@ -444,13 +448,17 @@ public class NamedList<T> implements Cloneable, Serializable, Iterable<Map.Entry
 
       @Override
       public T put(String  key, T value) {
+        if (allowDps) {
+          NamedList.this.add(key, value);
+          return null;
+        }
         int idx = NamedList.this.indexOf(key, 0);
         if (idx == -1) {
           NamedList.this.add(key, value);
         } else {
           NamedList.this.setVal(idx, value);
         }
-        return  null;
+        return null;
       }
 
       @Override

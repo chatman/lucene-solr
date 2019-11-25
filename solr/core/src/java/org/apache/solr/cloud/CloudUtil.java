@@ -236,7 +236,7 @@ public class CloudUtil {
    * <p>Note: for shards marked as inactive the current Solr behavior is that replicas remain active.
    * {@link org.apache.solr.cloud.autoscaling.sim.SimCloudManager} follows this behavior.</p>
    * @param expectedShards expected number of shards
-   * @param expectedReplicas expected number of active replicas
+   * @param expectedReplicas expected number of active replicas per shard
    * @param withInactive if true then count also inactive shards
    * @param requireLeaders if true then require that each shard has a leader
    */
@@ -244,12 +244,12 @@ public class CloudUtil {
                                                       boolean requireLeaders) {
     return (liveNodes, collectionState) -> {
       if (collectionState == null) {
-        log.info("-- null collection");
+        log.debug("-- null collection");
         return false;
       }
       Collection<Slice> slices = withInactive ? collectionState.getSlices() : collectionState.getActiveSlices();
       if (slices.size() != expectedShards) {
-        log.info("-- wrong number of slices for collection {}, expected={}, found={}: {}", collectionState.getName(), expectedShards, collectionState.getSlices().size(), collectionState.getSlices());
+        log.debug("-- wrong number of slices for collection {}, expected={}, found={}: {}", collectionState.getName(), expectedShards, collectionState.getSlices().size(), collectionState.getSlices());
         return false;
       }
       Set<String> leaderless = new HashSet<>();
@@ -268,7 +268,7 @@ public class CloudUtil {
             activeReplicas++;
         }
         if (activeReplicas != expectedReplicas) {
-          log.info("-- wrong number of active replicas for collection {} in slice {}, expected={}, found={}", collectionState.getName(), slice.getName(), expectedReplicas, activeReplicas);
+          log.debug("-- wrong number of active replicas for collection {} in slice {}, expected={}, found={}", collectionState.getName(), slice.getName(), expectedReplicas, activeReplicas);
           return false;
         }
       }

@@ -115,9 +115,9 @@ as demonstrated by the examples below.
 
 [NOTE]
 ====
-.\_route_ Param
+.\_route_ Parameter
 To ensure each nested update is routed to its respective shard,
-`\_route_` param must be set to the root document's ID when the
+`\_route_` parameter must be set to the root document's ID when the
 update does not have that root document.
 ====
 
@@ -415,7 +415,7 @@ $ curl -X POST -H 'Content-Type: application/json' 'http://localhost:8983/solr/t
     "ccc",1632740949182382080]}
 ----
 
-In this example, we have added 2 documents "aaa" and "ccc". As we have specified the parameter `\_version_=-1` , this request should not add the document with the id `aaa` because it already exists. The request succeeds & does not throw any error because the `failOnVersionConflicts=false` parameter is specified. The response shows that only document `ccc` is added and `aaa` is silently ignored.
+In this example, we have added 2 documents "aaa" and "ccc". As we have specified the parameter `\_version_=-1`, this request should not add the document with the id `aaa` because it already exists. The request succeeds & does not throw any error because the `failOnVersionConflicts=false` parameter is specified. The response shows that only document `ccc` is added and `aaa` is silently ignored.
 
 
 For more information, please also see Yonik Seeley's presentation on https://www.youtube.com/watch?v=WYVM6Wz-XTw[NoSQL features in Solr 4] from Apache Lucene EuroCon 2012.

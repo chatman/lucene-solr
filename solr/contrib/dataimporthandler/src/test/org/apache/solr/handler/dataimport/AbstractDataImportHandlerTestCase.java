@@ -39,7 +39,7 @@ import org.apache.solr.update.MergeIndexesCommand;
 import org.apache.solr.update.RollbackUpdateCommand;
 import org.apache.solr.update.processor.UpdateRequestProcessor;
 import org.apache.solr.update.processor.UpdateRequestProcessorFactory;
-import org.junit.Before;
+import org.junit.BeforeClass;
 
 /**
  * <p>
@@ -60,13 +60,10 @@ public abstract class AbstractDataImportHandlerTestCase extends
     FileUtils.copyDirectory(getFile("dih/solr"), testHome);
     initCore(config, schema, testHome.getAbsolutePath());
   }
-  
-  @Override
-  @Before
-  public void setUp() throws Exception {
-    super.setUp();
-    File home = createTempDir("dih-properties").toFile();
-    System.setProperty("solr.solr.home", home.getAbsolutePath());    
+
+  @BeforeClass
+  public static void baseBeforeClass() {
+    System.setProperty(DataImportHandler.ENABLE_DIH_DATA_CONFIG_PARAM, "true");
   }
 
   protected String loadDataConfig(String dataConfigFileName) {
@@ -118,6 +115,7 @@ public abstract class AbstractDataImportHandlerTestCase extends
    * @param extraParams any extra request parameters needed to be passed to DataImportHandler
    * @throws Exception in case of any error
    */
+  @SuppressWarnings({"rawtypes", "unchecked"})
   protected void runFullImport(String dataConfig, Map<String, String> extraParams) throws Exception {
     HashMap<String, String> params = new HashMap<>();
     params.put("command", "full-import");
@@ -137,7 +135,7 @@ public abstract class AbstractDataImportHandlerTestCase extends
   /**
    * Helper for creating a Context instance. Useful for testing Transformers
    */
-  @SuppressWarnings("unchecked")
+  @SuppressWarnings("rawtypes")
   public static TestContext getContext(EntityProcessorWrapper parent,
                                    VariableResolver resolver, DataSource parentDataSource,
                                    String currProcess, final List<Map<String, String>> entityFields,
@@ -153,7 +151,7 @@ public abstract class AbstractDataImportHandlerTestCase extends
    * Strings at even index are keys, odd-index strings are values in the
    * returned map
    */
-  @SuppressWarnings("unchecked")
+  @SuppressWarnings("rawtypes")
   public static Map createMap(Object... args) {
    return Utils.makeMap(args);
   }
@@ -219,6 +217,7 @@ public abstract class AbstractDataImportHandlerTestCase extends
       return delegate.getVariableResolver();
     }
 
+    @SuppressWarnings("rawtypes")
     @Override
     public DataSource getDataSource() {
       return delegate.getDataSource();
@@ -259,6 +258,7 @@ public abstract class AbstractDataImportHandlerTestCase extends
       return delegate.getParentContext();
     }
 
+    @SuppressWarnings("rawtypes")
     @Override
     public DataSource getDataSource(String name) {
       return delegate.getDataSource(name);

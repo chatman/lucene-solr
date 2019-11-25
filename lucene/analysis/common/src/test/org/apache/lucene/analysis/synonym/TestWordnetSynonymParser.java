@@ -45,6 +45,7 @@ public class TestWordnetSynonymParser extends BaseTokenStreamTestCase {
     analyzer.close();
     
     analyzer = new Analyzer() {
+      @SuppressWarnings("deprecation")
       @Override
       protected TokenStreamComponents createComponents(String fieldName) {
         Tokenizer tokenizer = new MockTokenizer(MockTokenizer.WHITESPACE, false);
@@ -66,6 +67,11 @@ public class TestWordnetSynonymParser extends BaseTokenStreamTestCase {
     /* multi words */
     assertAnalyzesTo(analyzer, "king's evil",
         new String[] { "king's", "king's", "evil", "meany" });
+
+    /* all expansions, test types */
+    assertAnalyzesTo(analyzer, "Lost in the forest",
+        new String[] { "Lost", "in", "the", "forest", "woods", "wood"},
+        new String[] { "word", "word", "word", "word", "SYNONYM", "SYNONYM" });
     analyzer.close();
   }
 }

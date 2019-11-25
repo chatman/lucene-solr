@@ -709,9 +709,9 @@ public class SimplePostTool {
    * @return true if this is a supported content type
    */
   protected boolean typeSupported(String type) {
-    for(String key : mimeMap.keySet()) {
-      if(mimeMap.get(key).equals(type)) {
-        if(fileTypes.contains(key))
+    for(Map.Entry<String, String> entry : mimeMap.entrySet()) {
+      if(entry.getValue().equals(type)) {
+        if(fileTypes.contains(entry.getKey()))
           return true;
       }
     }
@@ -1042,7 +1042,7 @@ public class SimplePostTool {
     StringBuilder sb = new StringBuilder();
     if (nodes.getLength() > 0) {
       for(int i = 0; i < nodes.getLength() ; i++) {
-        sb.append(nodes.item(i).getNodeValue() + " ");
+        sb.append(nodes.item(i).getNodeValue()).append(' ');
         if(!concatAll) break;
       }
       return sb.toString().trim();

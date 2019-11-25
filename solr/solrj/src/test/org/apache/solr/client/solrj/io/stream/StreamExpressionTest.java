@@ -16,7 +16,12 @@
  */
 package org.apache.solr.client.solrj.io.stream;
 
+import java.io.BufferedWriter;
+import java.io.File;
 import java.io.IOException;
+import java.nio.charset.StandardCharsets;
+import java.nio.file.Files;
+import java.nio.file.Paths;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.HashMap;
@@ -49,6 +54,8 @@ import org.apache.solr.client.solrj.request.UpdateRequest;
 import org.apache.solr.cloud.SolrCloudTestCase;
 import org.apache.solr.common.params.CommonParams;
 import org.apache.solr.common.params.ModifiableSolrParams;
+import org.apache.solr.core.CoreDescriptor;
+import org.apache.solr.core.SolrResourceLoader;
 import org.junit.Assume;
 import org.junit.Before;
 import org.junit.BeforeClass;
@@ -60,6 +67,7 @@ import org.junit.Test;
 public class StreamExpressionTest extends SolrCloudTestCase {
 
   private static final String COLLECTIONORALIAS = "collection1";
+  private static final String FILESTREAM_COLLECTION = "filestream_collection";
   private static final int TIMEOUT = DEFAULT_TIMEOUT;
   private static final String id = "id";
 
@@ -85,6 +93,12 @@ public class StreamExpressionTest extends SolrCloudTestCase {
     if (useAlias) {
       CollectionAdminRequest.createAlias(COLLECTIONORALIAS, collection).process(cluster.getSolrClient());
     }
+
+    // Create a collection for use by the filestream() expression, and place some files there for it to read.
+    CollectionAdminRequest.createCollection(FILESTREAM_COLLECTION, "conf", 1, 1).process(cluster.getSolrClient());
+    cluster.waitForActiveCollection(FILESTREAM_COLLECTION, 1, 1);
+    final String dataDir = findUserFilesDataDir();
+    populateFileStreamData(dataDir);
   }
 
   @Before
@@ -552,7 +566,7 @@ public class StreamExpressionTest extends SolrCloudTestCase {
 
     StreamFactory factory = new StreamFactory()
         .withCollectionZkHost(COLLECTIONORALIAS, cluster.getZkServer().getZkAddress())
-        .withFunctionName("random", RandomStream.class);
+        .withFunctionName("random", RandomFacadeStream.class);
 
 
     StreamContext context = new StreamContext();
@@ -571,6 +585,7 @@ public class StreamExpressionTest extends SolrCloudTestCase {
       stream.setStreamContext(context);
       List<Tuple> tuples2 = getTuples(stream);
       assert (tuples2.size() == 1000);
+
 
       boolean different = false;
       for (int i = 0; i < tuples1.size(); i++) {
@@ -601,6 +616,44 @@ public class StreamExpressionTest extends SolrCloudTestCase {
       List<Tuple> tuples3 = getTuples(stream);
       assert (tuples3.size() == 1);
 
+      //Exercise the DeepRandomStream with higher rows
+
+      expression = StreamExpressionParser.parse("random(" + COLLECTIONORALIAS + ", q=\"*:*\", rows=\"10001\", fl=\"id, a_i\")");
+      stream = factory.constructStream(expression);
+      stream.setStreamContext(context);
+      List<Tuple> tuples10 = getTuples(stream);
+      assert (tuples10.size() == 1000);
+
+      expression = StreamExpressionParser.parse("random(" + COLLECTIONORALIAS + ", q=\"*:*\", rows=\"10001\", fl=\"id, a_i\")");
+      stream = factory.constructStream(expression);
+      stream.setStreamContext(context);
+      List<Tuple> tuples11 = getTuples(stream);
+      assert (tuples11.size() == 1000);
+
+      different = false;
+      for (int i = 0; i < tuples10.size(); i++) {
+        Tuple tuple1 = tuples10.get(i);
+        Tuple tuple2 = tuples11.get(i);
+        if (!tuple1.get("id").equals(tuple2.get(id))) {
+          different = true;
+          break;
+        }
+      }
+
+      assertTrue(different);
+
+      Collections.sort(tuples10, new FieldComparator("id", ComparatorOrder.ASCENDING));
+      Collections.sort(tuples11, new FieldComparator("id", ComparatorOrder.ASCENDING));
+
+      for (int i = 0; i < tuples10.size(); i++) {
+        Tuple tuple1 = tuples10.get(i);
+        Tuple tuple2 = tuples11.get(i);
+        if (!tuple1.get("id").equals(tuple2.get(id))) {
+          assert(tuple1.getLong("id").equals(tuple2.get("a_i")));
+        }
+      }
+
+
 
       //Exercise the /stream handler
       ModifiableSolrParams sParams = new ModifiableSolrParams(StreamingTest.mapParams(CommonParams.QT, "/stream"));
@@ -609,6 +662,13 @@ public class StreamExpressionTest extends SolrCloudTestCase {
       SolrStream solrStream = new SolrStream(jetty.getBaseUrl().toString() + "/collection1", sParams);
       List<Tuple> tuples4 = getTuples(solrStream);
       assert (tuples4.size() == 1);
+
+      sParams = new ModifiableSolrParams(StreamingTest.mapParams(CommonParams.QT, "/stream"));
+      sParams.add("expr", "random(" + COLLECTIONORALIAS + ", q=\"*:*\", rows=\"10001\", fl=\"id, a_i\")");
+      jetty = cluster.getJettySolrRunner(0);
+      solrStream = new SolrStream(jetty.getBaseUrl().toString() + "/collection1", sParams);
+      tuples4 = getTuples(solrStream);
+      assert (tuples4.size() == 1000);
 
     } finally {
       cache.close();
@@ -666,14 +726,6 @@ public class StreamExpressionTest extends SolrCloudTestCase {
       cache.close();
     }
   }
-
-
-
-
-
-
-
-
 
   @Test
   public void testStatsStream() throws Exception {
@@ -3011,6 +3063,149 @@ public class StreamExpressionTest extends SolrCloudTestCase {
     }
   }
 
+  @Test
+  public void testCatStreamSingleFile() throws Exception {
+    final String catStream = "cat(\"topLevel1.txt\")";
+    ModifiableSolrParams paramsLoc = new ModifiableSolrParams();
+    paramsLoc.set("expr", catStream);
+    paramsLoc.set("qt", "/stream");
+    String url = cluster.getJettySolrRunners().get(0).getBaseUrl().toString()+"/"+FILESTREAM_COLLECTION;
+
+    SolrStream solrStream = new SolrStream(url, paramsLoc);
+
+    StreamContext context = new StreamContext();
+    solrStream.setStreamContext(context);
+    List<Tuple> tuples = getTuples(solrStream);
+    assertEquals(4, tuples.size());
+
+    for (int i = 0; i < 4; i++) {
+      Tuple t = tuples.get(i);
+      assertEquals("topLevel1.txt line " + String.valueOf(i+1), t.get("line"));
+      assertEquals("topLevel1.txt", t.get("file"));
+    }
+  }
+
+  @Test
+  public void testCatStreamEmptyFile() throws Exception {
+    final String catStream = "cat(\"topLevel-empty.txt\")";
+    ModifiableSolrParams paramsLoc = new ModifiableSolrParams();
+    paramsLoc.set("expr", catStream);
+    paramsLoc.set("qt", "/stream");
+    String url = cluster.getJettySolrRunners().get(0).getBaseUrl().toString()+"/"+FILESTREAM_COLLECTION;
+
+    SolrStream solrStream = new SolrStream(url, paramsLoc);
+
+    StreamContext context = new StreamContext();
+    solrStream.setStreamContext(context);
+    List<Tuple> tuples = getTuples(solrStream);
+
+    assertEquals(0, tuples.size());
+  }
+
+  @Test
+  public void testCatStreamMultipleFilesOneEmpty() throws Exception {
+    final String catStream = "cat(\"topLevel1.txt,topLevel-empty.txt\")";
+    ModifiableSolrParams paramsLoc = new ModifiableSolrParams();
+    paramsLoc.set("expr", catStream);
+    paramsLoc.set("qt", "/stream");
+    String url = cluster.getJettySolrRunners().get(0).getBaseUrl().toString()+"/"+FILESTREAM_COLLECTION;
+
+    SolrStream solrStream = new SolrStream(url, paramsLoc);
+
+    StreamContext context = new StreamContext();
+    solrStream.setStreamContext(context);
+    List<Tuple> tuples = getTuples(solrStream);
+
+    assertEquals(4, tuples.size());
+
+    for (int i = 0; i < 4; i++) {
+      Tuple t = tuples.get(i);
+      assertEquals("topLevel1.txt line " + String.valueOf(i+1), t.get("line"));
+      assertEquals("topLevel1.txt", t.get("file"));
+    }
+  }
+
+  @Test
+  public void testCatStreamMaxLines() throws Exception {
+    final String catStream = "cat(\"topLevel1.txt\", maxLines=2)";
+    ModifiableSolrParams paramsLoc = new ModifiableSolrParams();
+    paramsLoc.set("expr", catStream);
+    paramsLoc.set("qt", "/stream");
+    String url = cluster.getJettySolrRunners().get(0).getBaseUrl().toString()+"/"+FILESTREAM_COLLECTION;
+
+    SolrStream solrStream = new SolrStream(url, paramsLoc);
+
+    StreamContext context = new StreamContext();
+    solrStream.setStreamContext(context);
+    List<Tuple> tuples = getTuples(solrStream);
+    assertEquals(2, tuples.size());
+
+    for (int i = 0; i < 2; i++) {
+      Tuple t = tuples.get(i);
+      assertEquals("topLevel1.txt line " + String.valueOf(i+1), t.get("line"));
+      assertEquals("topLevel1.txt", t.get("file"));
+    }
+  }
+
+  @Test
+  public void testCatStreamDirectoryCrawl() throws Exception {
+    final String catStream = "cat(\"directory1\")";
+    ModifiableSolrParams paramsLoc = new ModifiableSolrParams();
+    paramsLoc.set("expr", catStream);
+    paramsLoc.set("qt", "/stream");
+    String url = cluster.getJettySolrRunners().get(0).getBaseUrl().toString()+"/"+FILESTREAM_COLLECTION;
+
+    SolrStream solrStream = new SolrStream(url, paramsLoc);
+
+    StreamContext context = new StreamContext();
+    solrStream.setStreamContext(context);
+    List<Tuple> tuples = getTuples(solrStream);
+    assertEquals(8, tuples.size());
+
+    final String expectedSecondLevel1Path = "directory1" + File.separator + "secondLevel1.txt";
+    for (int i = 0; i < 4; i++) {
+      Tuple t = tuples.get(i);
+      assertEquals("secondLevel1.txt line " + String.valueOf(i+1), t.get("line"));
+      assertEquals(expectedSecondLevel1Path, t.get("file"));
+    }
+
+    final String expectedSecondLevel2Path = "directory1" + File.separator + "secondLevel2.txt";
+    for (int i = 4; i < 8; i++) {
+      Tuple t = tuples.get(i);
+      assertEquals("secondLevel2.txt line " + String.valueOf(i - 3), t.get("line"));
+      assertEquals(expectedSecondLevel2Path, t.get("file"));
+    }
+  }
+
+  @Test
+  public void testCatStreamMultipleExplicitFiles() throws Exception {
+    final String catStream = "cat(\"topLevel1.txt,directory1" + File.separator + "secondLevel2.txt\")";
+    ModifiableSolrParams paramsLoc = new ModifiableSolrParams();
+    paramsLoc.set("expr", catStream);
+    paramsLoc.set("qt", "/stream");
+    String url = cluster.getJettySolrRunners().get(0).getBaseUrl().toString()+"/"+FILESTREAM_COLLECTION;
+
+    SolrStream solrStream = new SolrStream(url, paramsLoc);
+
+    StreamContext context = new StreamContext();
+    solrStream.setStreamContext(context);
+    List<Tuple> tuples = getTuples(solrStream);
+    assertEquals(8, tuples.size());
+
+    for (int i = 0; i < 4; i++) {
+      Tuple t = tuples.get(i);
+      assertEquals("topLevel1.txt line " + String.valueOf(i+1), t.get("line"));
+      assertEquals("topLevel1.txt", t.get("file"));
+    }
+
+    final String expectedSecondLevel2Path = "directory1" + File.separator + "secondLevel2.txt";
+    for (int i = 4; i < 8; i++) {
+      Tuple t = tuples.get(i);
+      assertEquals("secondLevel2.txt line " + String.valueOf(i - 3), t.get("line"));
+      assertEquals(expectedSecondLevel2Path, t.get("file"));
+    }
+  }
+
   private void assertSuccess(String expr, StreamContext streamContext) throws IOException {
     ModifiableSolrParams paramsLoc = new ModifiableSolrParams();
     paramsLoc.set("expr", expr);
@@ -3020,6 +3215,63 @@ public class StreamExpressionTest extends SolrCloudTestCase {
     TupleStream solrStream = new SolrStream(url, paramsLoc);
     solrStream.setStreamContext(streamContext);
     getTuples(solrStream);
+  }
+
+
+  private static String findUserFilesDataDir() {
+    for (JettySolrRunner jetty : cluster.getJettySolrRunners()) {
+      final String baseDir = cluster.getBaseDir().toAbsolutePath().toString();
+      for (CoreDescriptor coreDescriptor : jetty.getCoreContainer().getCoreDescriptors()) {
+        if (coreDescriptor.getCollectionName().equals(FILESTREAM_COLLECTION)) {
+          return Paths.get(jetty.getSolrHome(), SolrResourceLoader.USER_FILES_DIRECTORY).toAbsolutePath().toString();
+        }
+      }
+    }
+
+    throw new IllegalStateException("Unable to determine data-dir for: "+ FILESTREAM_COLLECTION);
+  }
+
+  /**
+   * Creates a tree of files underneath a provided data-directory.
+   *
+   * The filetree created looks like:
+   *
+   * dataDir
+   *   |- topLevel1.txt
+   *   |- topLevel2.txt
+   *   |- topLevel-empty.txt
+   *   |- directory1
+   *        |- secondLevel1.txt
+   *        |- secondLevel2.txt
+   *
+   * Each file contains 4 lines.  Each line looks like: "<filename> line <linenumber>"
+   */
+  private static void populateFileStreamData(String dataDir) throws Exception {
+    final File baseDataDir = new File(dataDir);
+    if (! baseDataDir.exists()) baseDataDir.mkdir();
+    final File directory1 = new File(Paths.get(dataDir, "directory1").toString());
+    directory1.mkdir();
+
+    final File topLevel1 = new File(Paths.get(dataDir, "topLevel1.txt").toString());
+    final File topLevel2 = new File(Paths.get(dataDir, "topLevel2.txt").toString());
+    final File topLevelEmpty = new File(Paths.get(dataDir, "topLevel-empty.txt").toString());
+    final File secondLevel1 = new File(Paths.get(dataDir, "directory1", "secondLevel1.txt").toString());
+    final File secondLevel2 = new File(Paths.get(dataDir, "directory1", "secondLevel2.txt").toString());
+    populateFileWithData(topLevel1);
+    populateFileWithData(topLevel2);
+    topLevelEmpty.createNewFile();
+    populateFileWithData(secondLevel1);
+    populateFileWithData(secondLevel2);
+  }
+
+  private static void populateFileWithData(File dataFile) throws Exception {
+    dataFile.createNewFile();
+    try (final BufferedWriter writer = Files.newBufferedWriter(Paths.get(dataFile.toURI()), StandardCharsets.UTF_8)) {
+      for (int i = 1; i <=4; i++) {
+        writer.write(dataFile.getName() + " line " + String.valueOf(i));
+        writer.newLine();
+      }
+    }
   }
 
   protected List<Tuple> getTuples(TupleStream tupleStream) throws IOException {

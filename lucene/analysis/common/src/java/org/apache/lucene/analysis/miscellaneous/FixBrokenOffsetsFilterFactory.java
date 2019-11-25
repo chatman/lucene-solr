@@ -25,14 +25,19 @@ import org.apache.lucene.analysis.util.TokenFilterFactory;
 /**
  * Factory for {@link FixBrokenOffsetsFilter}.
  * @since 7.0.0
+ * @lucene.spi {@value #NAME}
  */
 public class FixBrokenOffsetsFilterFactory extends TokenFilterFactory {
+
+  /** SPI name */
+  public static final String NAME = "fixBrokenOffsets";
 
   /** Sole constructor */
   public FixBrokenOffsetsFilterFactory(Map<String,String> args) {
     super(args);
   }
 
+  @SuppressWarnings("deprecation")
   @Override
   public TokenStream create(TokenStream input) {
     return new FixBrokenOffsetsFilter(input);
