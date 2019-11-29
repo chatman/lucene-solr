@@ -41,13 +41,16 @@ import java.util.concurrent.TimeUnit;
 import java.util.concurrent.TimeoutException;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicReference;
+import java.util.function.BiFunction;
 import java.util.function.Predicate;
 import java.util.function.UnaryOperator;
 import java.util.stream.Collectors;
 
+import org.apache.solr.client.solrj.cloud.ShardTerms;
 import org.apache.solr.client.solrj.cloud.autoscaling.AutoScalingConfig;
 import org.apache.solr.common.AlreadyClosedException;
 import org.apache.solr.common.Callable;
+import org.apache.solr.common.ShardTermsReplicaStateProvider;
 import org.apache.solr.common.SolrCloseable;
 import org.apache.solr.common.SolrException;
 import org.apache.solr.common.SolrException.ErrorCode;
@@ -338,15 +341,18 @@ public class ZkStateReader implements SolrCloseable {
 
   private Set<CountDownLatch> waitLatches = ConcurrentHashMap.newKeySet();
 
+  public final BiFunction<String, String, ShardTerms> termsDataProvider;
+
   public ZkStateReader(SolrZkClient zkClient) {
-    this(zkClient, null);
+    this(zkClient, null,null);
   }
 
-  public ZkStateReader(SolrZkClient zkClient, Runnable securityNodeListener) {
+  public ZkStateReader(SolrZkClient zkClient, Runnable securityNodeListener, BiFunction<String,String , ShardTerms> termsDataProvider) {
     this.zkClient = zkClient;
     this.configManager = new ZkConfigManager(zkClient);
     this.closeClient = false;
     this.securityNodeListener = securityNodeListener;
+    this.termsDataProvider = termsDataProvider;
     assert ObjectReleaseTracker.track(this);
   }
 
@@ -374,6 +380,7 @@ public class ZkStateReader implements SolrCloseable {
     this.closeClient = true;
     this.securityNodeListener = null;
 
+    this.termsDataProvider = null;
     assert ObjectReleaseTracker.track(this);
   }
 
@@ -943,6 +950,11 @@ public class ZkStateReader implements SolrCloseable {
       }
     }
     return null;
+  }
+
+  public boolean isNodeLive(String node) {
+    return liveNodes.contains(node);
+
   }
 
   /**
@@ -2325,5 +2337,21 @@ public class ZkStateReader implements SolrCloseable {
       }
       return result;
     }
+  }
+
+  public ClusterState.CollectionRef getCollectionRef(String coll){
+    return clusterState.getCollectionRef(coll);
+  }
+
+  private Map<String , ReplicaStateProvider> replicaStatProviders =  new ConcurrentHashMap<>();
+
+  public ReplicaStateProvider getReplicaStateProvider(String collection) {
+    return replicaStatProviders.computeIfAbsent(collection, s -> {
+      DocCollection coll = getClusterState().getCollection(collection);
+      return coll.getExternalState()?
+          new ShardTermsReplicaStateProvider(ZkStateReader.this, termsDataProvider):
+          new LegacyReplicaStateProvider(ZkStateReader.this);
+    });
+
   }
 }

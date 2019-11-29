@@ -39,6 +39,8 @@ import org.apache.solr.util.PropertiesUtil;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import static org.apache.solr.common.cloud.DocCollection.EXT_STATE;
+
 /**
  * A Solr core descriptor
  *
@@ -118,6 +120,7 @@ public class CoreDescriptor {
       CORE_COLLECTION,
       CORE_ROLES,
       CORE_NODE_NAME,
+      EXT_STATE,
       CloudDescriptor.NUM_SHARDS
   );
 
@@ -363,6 +366,10 @@ public class CoreDescriptor {
    */
   public String getCoreProperty(String prop, String defVal) {
     return coreProperties.getProperty(prop, defVal);
+  }
+
+  public boolean isExternState() {
+    return Boolean.parseBoolean((String) coreProperties.getOrDefault(EXT_STATE, "false"));
   }
 
   /**

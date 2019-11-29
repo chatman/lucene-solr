@@ -80,9 +80,9 @@ import static org.apache.solr.common.cloud.ZkStateReader.NRT_REPLICAS;
 import static org.apache.solr.common.cloud.ZkStateReader.PULL_REPLICAS;
 import static org.apache.solr.common.cloud.ZkStateReader.REPLICATION_FACTOR;
 import static org.apache.solr.common.cloud.ZkStateReader.TLOG_REPLICAS;
+import static org.apache.solr.common.params.CollectionAdminParams.ALIAS;
 import static org.apache.solr.common.params.CollectionAdminParams.COLL_CONF;
 import static org.apache.solr.common.params.CollectionAdminParams.COLOCATED_WITH;
-import static org.apache.solr.common.params.CollectionAdminParams.ALIAS;
 import static org.apache.solr.common.params.CollectionParams.CollectionAction.ADDREPLICA;
 import static org.apache.solr.common.params.CollectionParams.CollectionAction.MODIFYCOLLECTION;
 import static org.apache.solr.common.params.CommonAdminParams.ASYNC;
@@ -109,6 +109,7 @@ public class CreateCollectionCmd implements OverseerCollectionMessageHandler.Cmd
     }
     final Aliases aliases = ocmh.zkStateReader.getAliases();
     final String collectionName = message.getStr(NAME);
+    final String externalState = message.getStr(DocCollection.EXT_STATE);
     final boolean waitForFinalState = message.getBool(WAIT_FOR_FINAL_STATE, false);
     final String alias = message.getStr(ALIAS, collectionName);
     log.info("Create collection {}", collectionName);
@@ -259,6 +260,7 @@ public class CreateCollectionCmd implements OverseerCollectionMessageHandler.Cmd
         params.set(ZkStateReader.NUM_SHARDS_PROP, shardNames.size());
         params.set(CoreAdminParams.NEW_COLLECTION, "true");
         params.set(CoreAdminParams.REPLICA_TYPE, replicaPosition.type.name());
+        if(externalState != null) params.set(DocCollection.EXT_STATE, externalState);
 
         if (async != null) {
           String coreAdminAsyncId = async + Math.abs(System.nanoTime());
