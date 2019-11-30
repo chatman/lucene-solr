@@ -47,7 +47,15 @@ public interface SolrRequestInvoker {
     String node();
 
     /**If this request is constructed based on optimistic assumptions of cached state,
-     * @return null if all states are fresh
+     * The header is encoded as follows SOLR-STATE : coll1(234)/shard1(7876),shard2(876)|coll2(565),shard4(8665)
+     * The response header means the following
+     * SOLR-STATE-RSP is absent, the response is all good .
+     * eg: SOLR-STATE-RSP : 0:coll1(234)/shard2(879) means request is not
+     * processed because the state of coll1/shard2 is out of date and this node cannot serve the request, should retry
+     * eg: SOLR-STATE-RSP : 1:coll1(234)/shard2(879) means the request is processed successfully, but you may choose
+     * to invalidate the state of shard terms coll1/shard2. The correct version is 879, (the cached version was '876')
+     *
+     * @return null if all states are fresh do not send any header
      */
     StateAssumption getStateAssumptions();
 

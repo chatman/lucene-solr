@@ -41,4 +41,9 @@ public class LegacyReplicaStateProvider implements ReplicaStateProvider {
   public String getLeader(Slice slice, boolean forceFetch) {
     return slice.getLeader().getName();
   }
+
+  @Override
+  public void invalidate(String coll, String shard, int expected) {
+    //do nothing
+  }
 }

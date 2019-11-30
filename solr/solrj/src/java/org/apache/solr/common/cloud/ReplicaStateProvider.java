@@ -25,4 +25,10 @@ public interface ReplicaStateProvider {
 
   boolean isActive(Replica replica, boolean forceFetch);
 
+  /** Invalidate the local cache
+   * @param coll cannot be null. the name of the collection (if shard == null invalidate the state.json cache)
+   * @param shard name of the shard. Invalidate the state of shard terms
+   */
+  void invalidate(String coll, String shard, int expected);
+
 }

@@ -115,5 +115,8 @@ public class ShardTermsReplicaStateProvider implements ReplicaStateProvider {
     return false;
   }
 
-
+  @Override
+  public void invalidate(String coll, String shard, int expected) {
+    //todo
+  }
 }
