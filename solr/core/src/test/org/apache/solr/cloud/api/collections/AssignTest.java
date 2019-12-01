@@ -147,8 +147,8 @@ public class AssignTest extends SolrTestCaseJ4 {
       // TODO: fix this to be independent of ZK
       ZkDistribStateManager stateManager = new ZkDistribStateManager(zkClient);
       Map<String, Slice> slices = new HashMap<>();
-      slices.put("shard1", new Slice("shard1", new HashMap<>(), null));
-      slices.put("shard2", new Slice("shard2", new HashMap<>(), null));
+      slices.put("shard1", new Slice("shard1", new HashMap<>(), null, "collection1"));
+      slices.put("shard2", new Slice("shard2", new HashMap<>(), null, "collection1"));
 
       DocCollection docCollection = new DocCollection("collection1", slices, null, DocRouter.DEFAULT);
       assertEquals("Core name pattern changed", "collection1_shard1_replica_n1", Assign.buildSolrCoreName(stateManager, docCollection, "shard1", Replica.Type.NRT));

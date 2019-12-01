@@ -32,9 +32,6 @@ import org.apache.solr.common.util.Utils;
 public interface SolrRequestInvoker {
   /**
    * Make a request to one random replica
-   *
-   * @param request
-   * @param responseConsumer
    */
   void request(Request request, Utils.InputStreamConsumer responseConsumer) throws SolrException;
 
