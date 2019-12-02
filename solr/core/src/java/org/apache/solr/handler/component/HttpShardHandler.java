@@ -321,71 +321,31 @@ public class HttpShardHandler extends ShardHandler {
     CoreDescriptor coreDescriptor = req.getCore().getCoreDescriptor();
     CloudDescriptor cloudDescriptor = coreDescriptor.getCloudDescriptor();
     ZkController zkController = req.getCore().getCoreContainer().getZkController();
+    HttpShardHandlerFactory.WhitelistHostChecker hostChecker = httpShardHandlerFactory.getWhitelistHostChecker();
 
     final ReplicaListTransformer replicaListTransformer = httpShardHandlerFactory.getReplicaListTransformer(req);
 
-    if (shards != null) {
+    // Populate the slices
+    if (zkController != null) {
+      // SolrCloud mode
+      if (shards != null) {
+        computeSlicesFromShardsParameter(rb, shards);
+      } else {
+        // we weren't provided with an explicit list of slices to query via "shards", so use the cluster state
+        clusterState =  zkController.getClusterState();
+        slices = computeSlicesFromClusterState(rb, params, clusterState, cloudDescriptor);
+      }
+    } else {
+      // Standalone mode
+      // In standalone mode, we need host whitelist checking
+      if (hostChecker.isWhitelistHostCheckingEnabled() && !hostChecker.hasExplicitWhitelist()) {
+        throw new SolrException(ErrorCode.FORBIDDEN, "HttpShardHandlerFactory "+HttpShardHandlerFactory.INIT_SHARDS_WHITELIST
+            +" not configured but required (in lieu of ZkController and ClusterState) when using the '"+ShardParams.SHARDS+"' parameter."
+            +HttpShardHandlerFactory.SET_SOLR_DISABLE_SHARDS_WHITELIST_CLUE);
+      }
       List<String> lst = StrUtils.splitSmart(shards, ",", true);
       rb.shards = lst.toArray(new String[lst.size()]);
       rb.slices = new String[rb.shards.length];
-
-      if (zkController != null) {
-        // figure out which shards are slices
-        for (int i=0; i<rb.shards.length; i++) {
-          if (rb.shards[i].indexOf('/') < 0) {
-            // this is a logical shard
-            rb.slices[i] = rb.shards[i];
-            rb.shards[i] = null;
-          }
-        }
-      }
-    } else if (zkController != null) {
-      // we weren't provided with an explicit list of slices to query via "shards", so use the cluster state
-
-      clusterState =  zkController.getClusterState();
-      String shardKeys =  params.get(ShardParams._ROUTE_);
-
-      // This will be the complete list of slices we need to query for this request.
-      slices = new HashMap<>();
-
-      // we need to find out what collections this request is for.
-
-      // A comma-separated list of specified collections.
-      // Eg: "collection1,collection2,collection3"
-      String collections = params.get("collection");
-      if (collections != null) {
-        // If there were one or more collections specified in the query, split
-        // each parameter and store as a separate member of a List.
-        List<String> collectionList = StrUtils.splitSmart(collections, ",",
-            true);
-        // In turn, retrieve the slices that cover each collection from the
-        // cloud state and add them to the Map 'slices'.
-        for (String collectionName : collectionList) {
-          // The original code produced <collection-name>_<shard-name> when the collections
-          // parameter was specified (see ClientUtils.appendMap)
-          // Is this necessary if ony one collection is specified?
-          // i.e. should we change multiCollection to collectionList.size() > 1?
-          addSlices(slices, clusterState, params, collectionName,  shardKeys, true);
-        }
-      } else {
-        // just this collection
-        String collectionName = cloudDescriptor.getCollectionName();
-        addSlices(slices, clusterState, params, collectionName,  shardKeys, false);
-      }
-
-
-      // Store the logical slices in the ResponseBuilder and create a new
-      // String array to hold the physical shards (which will be mapped
-      // later).
-      rb.slices = slices.keySet().toArray(new String[slices.size()]);
-      rb.shards = new String[rb.slices.length];
-    }
-
-    HttpShardHandlerFactory.WhitelistHostChecker hostChecker = httpShardHandlerFactory.getWhitelistHostChecker();
-    if (shards != null && zkController == null && hostChecker.isWhitelistHostCheckingEnabled() && !hostChecker.hasExplicitWhitelist()) {
-      throw new SolrException(ErrorCode.FORBIDDEN, "HttpShardHandlerFactory "+HttpShardHandlerFactory.INIT_SHARDS_WHITELIST
-          +" not configured but required (in lieu of ZkController and ClusterState) when using the '"+ShardParams.SHARDS+"' parameter."
-          +HttpShardHandlerFactory.SET_SOLR_DISABLE_SHARDS_WHITELIST_CLUE);
     }
 
     //
@@ -512,6 +472,68 @@ public class HttpShardHandler extends ShardHandler {
     if(shards_start != null) {
       rb.shards_start = Integer.parseInt(shards_start);
     }
+  }
+
+  private void computeSlicesFromShardsParameter(ResponseBuilder rb, final String shards) {
+    List<String> lst = StrUtils.splitSmart(shards, ",", true);
+    rb.shards = lst.toArray(new String[lst.size()]);
+    rb.slices = new String[rb.shards.length];
+    // figure out which shards are slices
+    for (int i=0; i<rb.shards.length; i++) {
+      if (rb.shards[i].indexOf('/') < 0) {
+        // this is a logical shard
+        rb.slices[i] = rb.shards[i];
+        rb.shards[i] = null;
+      }
+    }
+  }
+
+  /*
+   * Use the clusterstate and compute the slices to query for this distributed request.
+   * Populates these slices to the response builder (rb.slices).
+   * 
+   * @return Map of key as slice name and value as Slice instance
+   */
+  private Map<String,Slice> computeSlicesFromClusterState(ResponseBuilder rb, final SolrParams params, ClusterState clusterState,
+      CloudDescriptor cloudDescriptor) {
+    Map<String,Slice> slices;
+    String shardKeys =  params.get(ShardParams._ROUTE_);
+
+    // This will be the complete list of slices we need to query for this request.
+    slices = new HashMap<>();
+
+    // we need to find out what collections this request is for.
+
+    // A comma-separated list of specified collections.
+    // Eg: "collection1,collection2,collection3"
+    String collections = params.get("collection");
+    if (collections != null) {
+      // If there were one or more collections specified in the query, split
+      // each parameter and store as a separate member of a List.
+      List<String> collectionList = StrUtils.splitSmart(collections, ",",
+          true);
+      // In turn, retrieve the slices that cover each collection from the
+      // cloud state and add them to the Map 'slices'.
+      for (String collectionName : collectionList) {
+        // The original code produced <collection-name>_<shard-name> when the collections
+        // parameter was specified (see ClientUtils.appendMap)
+        // Is this necessary if ony one collection is specified?
+        // i.e. should we change multiCollection to collectionList.size() > 1?
+        addSlices(slices, clusterState, params, collectionName,  shardKeys, true);
+      }
+    } else {
+      // just this collection
+      String collectionName = cloudDescriptor.getCollectionName();
+      addSlices(slices, clusterState, params, collectionName,  shardKeys, false);
+    }
+
+
+    // Store the logical slices in the ResponseBuilder and create a new
+    // String array to hold the physical shards (which will be mapped
+    // later).
+    rb.slices = slices.keySet().toArray(new String[slices.size()]);
+    rb.shards = new String[rb.slices.length];
+    return slices;
   }
 
   private static List<Replica> collectEligibleReplicas(Slice slice, ClusterState clusterState, boolean onlyNrtReplicas, Predicate<Replica> isShardLeader) {
