@@ -332,6 +332,11 @@ public class HttpShardHandler extends ShardHandler {
         clusterState =  zkController.getClusterState();
         slices = computeSlicesFromClusterState(rb, params, clusterState, cloudDescriptor);
       }
+      // Map slices to shards
+      boolean shortCircuit = mapSlicesToShards(rb, req, params, shards, clusterState, slices, coreDescriptor, cloudDescriptor, zkController);
+      if (shortCircuit) {
+        return;
+      }
     } else {
       // Standalone mode
       // In standalone mode, we need host whitelist checking
@@ -352,16 +357,6 @@ public class HttpShardHandler extends ShardHandler {
       }
     }
 
-    //
-    // Map slices to shards
-    //
-    if (zkController != null) {
-      boolean shortCircuit = mapSlicesToShards(rb, req, params, shards, clusterState, slices, coreDescriptor, cloudDescriptor, zkController);
-      if (shortCircuit) {
-        return;
-      }
-    }
-
     String shards_rows = params.get(ShardParams.SHARDS_ROWS);
     if(shards_rows != null) {
       rb.shards_rows = Integer.parseInt(shards_rows);
@@ -379,7 +374,8 @@ public class HttpShardHandler extends ShardHandler {
       final String shards, ClusterState clusterState, Map<String,Slice> slices, CoreDescriptor coreDescriptor,
       CloudDescriptor cloudDescriptor, ZkController zkController) {
     assert zkController != null: "We should be in cloud mode if we reach this point";
-    
+    assert rb.slices != null: "We shouldn't be here if slices are not populated till now";
+
     HttpShardHandlerFactory.WhitelistHostChecker hostChecker = httpShardHandlerFactory.getWhitelistHostChecker();
     final ReplicaListTransformer replicaListTransformer = httpShardHandlerFactory.getReplicaListTransformer(req);
 
