@@ -321,9 +321,6 @@ public class HttpShardHandler extends ShardHandler {
     CoreDescriptor coreDescriptor = req.getCore().getCoreDescriptor();
     CloudDescriptor cloudDescriptor = coreDescriptor.getCloudDescriptor();
     ZkController zkController = req.getCore().getCoreContainer().getZkController();
-    HttpShardHandlerFactory.WhitelistHostChecker hostChecker = httpShardHandlerFactory.getWhitelistHostChecker();
-
-    final ReplicaListTransformer replicaListTransformer = httpShardHandlerFactory.getReplicaListTransformer(req);
 
     // Populate the slices
     if (zkController != null) {
@@ -338,6 +335,7 @@ public class HttpShardHandler extends ShardHandler {
     } else {
       // Standalone mode
       // In standalone mode, we need host whitelist checking
+      HttpShardHandlerFactory.WhitelistHostChecker hostChecker = httpShardHandlerFactory.getWhitelistHostChecker();
       if (hostChecker.isWhitelistHostCheckingEnabled() && !hostChecker.hasExplicitWhitelist()) {
         throw new SolrException(ErrorCode.FORBIDDEN, "HttpShardHandlerFactory "+HttpShardHandlerFactory.INIT_SHARDS_WHITELIST
             +" not configured but required (in lieu of ZkController and ClusterState) when using the '"+ShardParams.SHARDS+"' parameter."
@@ -346,124 +344,24 @@ public class HttpShardHandler extends ShardHandler {
       List<String> lst = StrUtils.splitSmart(shards, ",", true);
       rb.shards = lst.toArray(new String[lst.size()]);
       rb.slices = new String[rb.shards.length];
+      
+      if (shards != null) {
+        // No cloud, verbatim check of shards
+        hostChecker = httpShardHandlerFactory.getWhitelistHostChecker();
+        hostChecker.checkWhitelist(shards, new ArrayList<>(Arrays.asList(shards.split("[,|]"))));
+      }
     }
 
     //
     // Map slices to shards
     //
     if (zkController != null) {
-
-      // Are we hosting the shard that this request is for, and are we active? If so, then handle it ourselves
-      // and make it a non-distributed request.
-      String ourSlice = cloudDescriptor.getShardId();
-      String ourCollection = cloudDescriptor.getCollectionName();
-      // Some requests may only be fulfilled by replicas of type Replica.Type.NRT
-      boolean onlyNrtReplicas = Boolean.TRUE == req.getContext().get(ONLY_NRT_REPLICAS);
-      if (rb.slices.length == 1 && rb.slices[0] != null
-          && ( rb.slices[0].equals(ourSlice) || rb.slices[0].equals(ourCollection + "_" + ourSlice) )  // handle the <collection>_<slice> format
-          && cloudDescriptor.getLastPublished() == Replica.State.ACTIVE
-          && (!onlyNrtReplicas || cloudDescriptor.getReplicaType() == Replica.Type.NRT)) {
-        boolean shortCircuit = params.getBool("shortCircuit", true);       // currently just a debugging parameter to check distrib search on a single node
-
-        String targetHandler = params.get(ShardParams.SHARDS_QT);
-        shortCircuit = shortCircuit && targetHandler == null;             // if a different handler is specified, don't short-circuit
-
-        if (shortCircuit) {
-          rb.isDistrib = false;
-          rb.shortCircuitedURL = ZkCoreNodeProps.getCoreUrl(zkController.getBaseUrl(), coreDescriptor.getName());
-          if (hostChecker.isWhitelistHostCheckingEnabled() && hostChecker.hasExplicitWhitelist()) {
-            /*
-             * We only need to check the host whitelist if there is an explicit whitelist (other than all the live nodes)
-             * when the "shards" indicate cluster state elements only
-             */
-            hostChecker.checkWhitelist(clusterState, shards, Arrays.asList(rb.shortCircuitedURL));
-          }
-          return;
-        }
-        // We shouldn't need to do anything to handle "shard.rows" since it was previously meant to be an optimization?
-      }
-      
-      if (clusterState == null && zkController != null) {
-        clusterState =  zkController.getClusterState();
-      }
-
-
-      for (int i=0; i<rb.shards.length; i++) {
-        if (rb.shards[i] != null) {
-          final List<String> shardUrls = StrUtils.splitSmart(rb.shards[i], "|", true);
-          replicaListTransformer.transform(shardUrls);
-          hostChecker.checkWhitelist(clusterState, shards, shardUrls);
-          // And now recreate the | delimited list of equivalent servers
-          rb.shards[i] = createSliceShardsStr(shardUrls);
-        } else {
-          if (slices == null) {
-            slices = clusterState.getCollection(cloudDescriptor.getCollectionName()).getSlicesMap();
-          }
-          String sliceName = rb.slices[i];
-
-          Slice slice = slices.get(sliceName);
-
-          if (slice==null) {
-            // Treat this the same as "all servers down" for a slice, and let things continue
-            // if partial results are acceptable
-            rb.shards[i] = "";
-            continue;
-            // throw new SolrException(SolrException.ErrorCode.BAD_REQUEST, "no such shard: " + sliceName);
-          }
-          final Predicate<Replica> isShardLeader = new Predicate<Replica>() {
-            private Replica shardLeader = null;
-
-            @Override
-            public boolean test(Replica replica) {
-              if (shardLeader == null) {
-                try {
-                  shardLeader = zkController.getZkStateReader().getLeaderRetry(cloudDescriptor.getCollectionName(), slice.getName());
-                } catch (InterruptedException e) {
-                  throw new SolrException(SolrException.ErrorCode.SERVICE_UNAVAILABLE, "Exception finding leader for shard " + slice.getName() + " in collection " 
-                      + cloudDescriptor.getCollectionName(), e);
-                } catch (SolrException e) {
-                  if (log.isDebugEnabled()) {
-                    log.debug("Exception finding leader for shard {} in collection {}. Collection State: {}", 
-                        slice.getName(), cloudDescriptor.getCollectionName(), zkController.getZkStateReader().getClusterState().getCollectionOrNull(cloudDescriptor.getCollectionName()));
-                  }
-                  throw e;
-                }
-              }
-              return replica.getName().equals(shardLeader.getName());
-            }
-          };
-
-          final List<Replica> eligibleSliceReplicas = collectEligibleReplicas(slice, clusterState, onlyNrtReplicas, isShardLeader);
-
-          final List<String> shardUrls = transformReplicasToShardUrls(replicaListTransformer, eligibleSliceReplicas);
-
-          if (hostChecker.isWhitelistHostCheckingEnabled() && hostChecker.hasExplicitWhitelist()) {
-            /*
-             * We only need to check the host whitelist if there is an explicit whitelist (other than all the live nodes)
-             * when the "shards" indicate cluster state elements only
-             */
-            hostChecker.checkWhitelist(clusterState, shards, shardUrls);
-          }
-
-          // And now recreate the | delimited list of equivalent servers
-          final String sliceShardsStr = createSliceShardsStr(shardUrls);
-          if (sliceShardsStr.isEmpty()) {
-            boolean tolerant = ShardParams.getShardsTolerantAsBool(rb.req.getParams());
-            if (!tolerant) {
-              // stop the check when there are no replicas available for a shard
-              throw new SolrException(SolrException.ErrorCode.SERVICE_UNAVAILABLE,
-                  "no servers hosting shard: " + rb.slices[i]);
-            }
-          }
-          rb.shards[i] = sliceShardsStr;
-        }
-      }
-    } else {
-      if (shards != null) {
-        // No cloud, verbatim check of shards
-        hostChecker.checkWhitelist(shards, new ArrayList<>(Arrays.asList(shards.split("[,|]"))));
+      boolean shortCircuit = mapSlicesToShards(rb, req, params, shards, clusterState, slices, coreDescriptor, cloudDescriptor, zkController);
+      if (shortCircuit) {
+        return;
       }
     }
+
     String shards_rows = params.get(ShardParams.SHARDS_ROWS);
     if(shards_rows != null) {
       rb.shards_rows = Integer.parseInt(shards_rows);
@@ -472,6 +370,123 @@ public class HttpShardHandler extends ShardHandler {
     if(shards_start != null) {
       rb.shards_start = Integer.parseInt(shards_start);
     }
+  }
+
+  /*
+   * @return true if shortcircuited, false if completed properly.
+   */
+  private boolean mapSlicesToShards(ResponseBuilder rb, final SolrQueryRequest req, final SolrParams params,
+      final String shards, ClusterState clusterState, Map<String,Slice> slices, CoreDescriptor coreDescriptor,
+      CloudDescriptor cloudDescriptor, ZkController zkController) {
+    assert zkController != null: "We should be in cloud mode if we reach this point";
+    
+    HttpShardHandlerFactory.WhitelistHostChecker hostChecker = httpShardHandlerFactory.getWhitelistHostChecker();
+    final ReplicaListTransformer replicaListTransformer = httpShardHandlerFactory.getReplicaListTransformer(req);
+
+    // Are we hosting the shard that this request is for, and are we active? If so, then handle it ourselves
+    // and make it a non-distributed request.
+    String ourSlice = cloudDescriptor.getShardId();
+    String ourCollection = cloudDescriptor.getCollectionName();
+    // Some requests may only be fulfilled by replicas of type Replica.Type.NRT
+    boolean onlyNrtReplicas = Boolean.TRUE == req.getContext().get(ONLY_NRT_REPLICAS);
+    if (rb.slices.length == 1 && rb.slices[0] != null
+        && ( rb.slices[0].equals(ourSlice) || rb.slices[0].equals(ourCollection + "_" + ourSlice) )  // handle the <collection>_<slice> format
+        && cloudDescriptor.getLastPublished() == Replica.State.ACTIVE
+        && (!onlyNrtReplicas || cloudDescriptor.getReplicaType() == Replica.Type.NRT)) {
+      boolean shortCircuit = params.getBool("shortCircuit", true);       // currently just a debugging parameter to check distrib search on a single node
+
+      String targetHandler = params.get(ShardParams.SHARDS_QT);
+      shortCircuit = shortCircuit && targetHandler == null;             // if a different handler is specified, don't short-circuit
+
+      if (shortCircuit) {
+        rb.isDistrib = false;
+        rb.shortCircuitedURL = ZkCoreNodeProps.getCoreUrl(zkController.getBaseUrl(), coreDescriptor.getName());
+        if (hostChecker.isWhitelistHostCheckingEnabled() && hostChecker.hasExplicitWhitelist()) {
+          // We only need to check the host whitelist if there is an explicit whitelist (other than all the live nodes)
+          // when the "shards" indicate cluster state elements only
+          hostChecker.checkWhitelist(clusterState, shards, Arrays.asList(rb.shortCircuitedURL));
+        }
+        return true;
+      }
+      // We shouldn't need to do anything to handle "shard.rows" since it was previously meant to be an optimization?
+    }
+    
+    if (clusterState == null && zkController != null) {
+      clusterState =  zkController.getClusterState();
+    }
+
+
+    for (int i=0; i<rb.shards.length; i++) {
+      if (rb.shards[i] != null) {
+        final List<String> shardUrls = StrUtils.splitSmart(rb.shards[i], "|", true);
+        replicaListTransformer.transform(shardUrls);
+        hostChecker.checkWhitelist(clusterState, shards, shardUrls);
+        // And now recreate the | delimited list of equivalent servers
+        rb.shards[i] = createSliceShardsStr(shardUrls);
+      } else {
+        if (slices == null) {
+          slices = clusterState.getCollection(cloudDescriptor.getCollectionName()).getSlicesMap();
+        }
+        String sliceName = rb.slices[i];
+
+        Slice slice = slices.get(sliceName);
+
+        if (slice==null) {
+          // Treat this the same as "all servers down" for a slice, and let things continue
+          // if partial results are acceptable
+          rb.shards[i] = "";
+          continue;
+          // throw new SolrException(SolrException.ErrorCode.BAD_REQUEST, "no such shard: " + sliceName);
+        }
+        final Predicate<Replica> isShardLeader = new Predicate<Replica>() {
+          private Replica shardLeader = null;
+
+          @Override
+          public boolean test(Replica replica) {
+            if (shardLeader == null) {
+              try {
+                shardLeader = zkController.getZkStateReader().getLeaderRetry(cloudDescriptor.getCollectionName(), slice.getName());
+              } catch (InterruptedException e) {
+                throw new SolrException(SolrException.ErrorCode.SERVICE_UNAVAILABLE, "Exception finding leader for shard " + slice.getName() + " in collection " 
+                    + cloudDescriptor.getCollectionName(), e);
+              } catch (SolrException e) {
+                if (log.isDebugEnabled()) {
+                  log.debug("Exception finding leader for shard {} in collection {}. Collection State: {}", 
+                      slice.getName(), cloudDescriptor.getCollectionName(), zkController.getZkStateReader().getClusterState().getCollectionOrNull(cloudDescriptor.getCollectionName()));
+                }
+                throw e;
+              }
+            }
+            return replica.getName().equals(shardLeader.getName());
+          }
+        };
+
+        final List<Replica> eligibleSliceReplicas = collectEligibleReplicas(slice, clusterState, onlyNrtReplicas, isShardLeader);
+
+        final List<String> shardUrls = transformReplicasToShardUrls(replicaListTransformer, eligibleSliceReplicas);
+
+        if (hostChecker.isWhitelistHostCheckingEnabled() && hostChecker.hasExplicitWhitelist()) {
+          /*
+           * We only need to check the host whitelist if there is an explicit whitelist (other than all the live nodes)
+           * when the "shards" indicate cluster state elements only
+           */
+          hostChecker.checkWhitelist(clusterState, shards, shardUrls);
+        }
+
+        // And now recreate the | delimited list of equivalent servers
+        final String sliceShardsStr = createSliceShardsStr(shardUrls);
+        if (sliceShardsStr.isEmpty()) {
+          boolean tolerant = ShardParams.getShardsTolerantAsBool(rb.req.getParams());
+          if (!tolerant) {
+            // stop the check when there are no replicas available for a shard
+            throw new SolrException(SolrException.ErrorCode.SERVICE_UNAVAILABLE,
+                "no servers hosting shard: " + rb.slices[i]);
+          }
+        }
+        rb.shards[i] = sliceShardsStr;
+      }
+    }
+    return false;
   }
 
   private void computeSlicesFromShardsParameter(ResponseBuilder rb, final String shards) {
