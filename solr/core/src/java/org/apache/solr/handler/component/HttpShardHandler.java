@@ -33,7 +33,6 @@ import java.util.function.Predicate;
 
 import org.apache.http.client.HttpClient;
 import org.apache.solr.client.solrj.SolrResponse;
-import org.apache.solr.client.solrj.cloud.LegacyRequestInvoker;
 import org.apache.solr.client.solrj.cloud.SolrRequestInvoker;
 import org.apache.solr.client.solrj.impl.Http2SolrClient;
 import org.apache.solr.client.solrj.request.QueryRequest;
