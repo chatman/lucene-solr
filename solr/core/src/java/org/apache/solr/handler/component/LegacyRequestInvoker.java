@@ -37,6 +37,7 @@ import org.apache.solr.common.SolrException;
 import org.apache.solr.common.params.CommonParams;
 import org.apache.solr.common.params.ModifiableSolrParams;
 import org.apache.solr.common.util.JavaBinCodec;
+import org.apache.solr.common.util.Utils;
 import org.apache.solr.request.SolrRequestInfo;
 import org.apache.solr.util.tracing.SolrRequestCarrier;
 
@@ -148,8 +149,8 @@ public class LegacyRequestInvoker implements SolrRequestInvoker {
   }
 
   @Override
-  public ShardResponse request(Request request) throws SolrException {
-    return null;
+  public void request(Request request, Utils.InputStreamConsumer responseConsumer) throws SolrException {
+    throw new UnsupportedOperationException();
   }
 
 }
