@@ -27,13 +27,13 @@ import org.apache.solr.client.solrj.request.RequestWriter;
 import org.apache.solr.common.MapWriter;
 import org.apache.solr.common.SolrException;
 import org.apache.solr.common.params.SolrParams;
-import org.apache.solr.common.util.Utils;
+import org.apache.solr.handler.component.ShardResponse;
 
 public interface SolrRequestInvoker {
   /**
    * Make a request to one random replica
    */
-  void request(Request request, Utils.InputStreamConsumer responseConsumer) throws SolrException;
+  ShardResponse request(Request request) throws SolrException;
 
   enum Type {
     QUERY, UPDATE, ADMIN, DIRECT
