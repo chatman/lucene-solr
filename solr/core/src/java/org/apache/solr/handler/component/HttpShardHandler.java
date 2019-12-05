@@ -16,11 +16,7 @@
  */
 package org.apache.solr.handler.component;
 
-import static org.apache.solr.handler.component.ShardRequest.PURPOSE_GET_FIELDS;
-
-import java.io.IOException;
 import java.lang.invoke.MethodHandles;
-import java.net.ConnectException;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collection;
@@ -33,15 +29,13 @@ import java.util.concurrent.Callable;
 import java.util.concurrent.CompletionService;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.Future;
-import java.util.concurrent.TimeUnit;
 import java.util.function.Predicate;
 
-import org.apache.solr.client.solrj.SolrRequest;
+import org.apache.http.client.HttpClient;
 import org.apache.solr.client.solrj.SolrResponse;
-import org.apache.solr.client.solrj.SolrServerException;
-import org.apache.solr.client.solrj.impl.BinaryResponseParser;
+import org.apache.solr.client.solrj.cloud.LegacyRequestInvoker;
+import org.apache.solr.client.solrj.cloud.SolrRequestInvoker;
 import org.apache.solr.client.solrj.impl.Http2SolrClient;
-import org.apache.solr.client.solrj.impl.LBSolrClient;
 import org.apache.solr.client.solrj.request.QueryRequest;
 import org.apache.solr.client.solrj.routing.ReplicaListTransformer;
 import org.apache.solr.client.solrj.util.ClientUtils;
@@ -54,25 +48,20 @@ import org.apache.solr.common.cloud.DocCollection;
 import org.apache.solr.common.cloud.Replica;
 import org.apache.solr.common.cloud.Slice;
 import org.apache.solr.common.cloud.ZkCoreNodeProps;
-import org.apache.solr.common.params.CommonParams;
 import org.apache.solr.common.params.ModifiableSolrParams;
 import org.apache.solr.common.params.ShardParams;
 import org.apache.solr.common.params.SolrParams;
-import org.apache.solr.common.util.JavaBinCodec;
 import org.apache.solr.common.util.NamedList;
 import org.apache.solr.common.util.StrUtils;
 import org.apache.solr.core.CoreDescriptor;
 import org.apache.solr.request.SolrQueryRequest;
-import org.apache.solr.request.SolrRequestInfo;
 import org.apache.solr.util.tracing.GlobalTracer;
-import org.apache.solr.util.tracing.SolrRequestCarrier;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.slf4j.MDC;
 
 import io.opentracing.Span;
 import io.opentracing.Tracer;
-import io.opentracing.propagation.Format;
 
 public class HttpShardHandler extends ShardHandler {
   
@@ -88,12 +77,23 @@ public class HttpShardHandler extends ShardHandler {
   private CompletionService<ShardResponse> completionService;
   private Set<Future<ShardResponse>> pending;
   private Map<String,List<String>> shardToURLs;
-  private Http2SolrClient httpClient;
+  private Http2SolrClient http2Client;
+  private HttpClient legacyClient;
 
   private static final Logger log = LoggerFactory.getLogger(MethodHandles.lookup().lookupClass());
 
-  public HttpShardHandler(HttpShardHandlerFactory httpShardHandlerFactory, Http2SolrClient httpClient) {
-    this.httpClient = httpClient;
+  public HttpShardHandler(HttpShardHandlerFactory httpShardHandlerFactory, Http2SolrClient http2Client) {
+    this(httpShardHandlerFactory);
+    this.http2Client = http2Client;
+  }
+
+  @Deprecated // for backward-compatibility when we are moving from apache http client to jetty client
+  public HttpShardHandler(HttpShardHandlerFactory httpShardHandlerFactory, HttpClient legacyClient) {
+    this(httpShardHandlerFactory);
+    this.legacyClient = legacyClient;
+  }
+
+  private HttpShardHandler(HttpShardHandlerFactory httpShardHandlerFactory) {
     this.httpShardHandlerFactory = httpShardHandlerFactory;
     completionService = httpShardHandlerFactory.newCompletionService();
     pending = new HashSet<>();
@@ -101,9 +101,8 @@ public class HttpShardHandler extends ShardHandler {
     // maps "localhost:8983|localhost:7574" to a shuffled List("http://localhost:8983","http://localhost:7574")
     // This is primarily to keep track of what order we should use to query the replicas of a shard
     // so that we use the same replica for all phases of a distributed request.
-    shardToURLs = new HashMap<>();
+    shardToURLs = new HashMap<>();    
   }
-
 
   private static class SimpleSolrResponse extends SolrResponse {
 
@@ -144,12 +143,6 @@ public class HttpShardHandler extends ShardHandler {
     return urls;
   }
 
-  private static final BinaryResponseParser READ_STR_AS_CHARSEQ_PARSER = new BinaryResponseParser() {
-    @Override
-    protected JavaBinCodec createCodec() {
-      return new JavaBinCodec(null, stringCache).setReadStringAsCharSeq(true);
-    }
-  };
 
   @Override
   public void submit(final ShardRequest sreq, final String shard, final ModifiableSolrParams params) {
@@ -160,8 +153,10 @@ public class HttpShardHandler extends ShardHandler {
     final Span span = tracer != null? tracer.activeSpan() : null;
 
     Callable<ShardResponse> task = () -> {
-      ShardResponse srspTransformed = makeShardRequest(sreq, shard, params, urls, tracer, span);
-      return srspTransformed;
+      SolrRequestInvoker requestInvoker = new LegacyRequestInvoker(http2Client, legacyClient, httpShardHandlerFactory.getLoadBalancer(), 
+          httpShardHandlerFactory.permittedLoadBalancerRequestsMinimumAbsolute, httpShardHandlerFactory.permittedLoadBalancerRequestsMaximumFraction);
+      ShardResponse shardResponse = ((LegacyRequestInvoker)requestInvoker).request(sreq, shard, params, urls, tracer, span);
+      return shardResponse;
     };
 
     try {
@@ -178,76 +173,10 @@ public class HttpShardHandler extends ShardHandler {
     }
   }
 
-  /**
-   * Make one request (sreq & params) to a given shard.
-   */
-  private ShardResponse makeShardRequest(final ShardRequest sreq, final String shard, final ModifiableSolrParams params,
-      final List<String> urls, final Tracer tracer, final Span span) {
-    ShardResponse srsp = new ShardResponse();
-    if (sreq.nodeName != null) {
-      srsp.setNodeName(sreq.nodeName);
-    }
-    srsp.setShardRequest(sreq);
-    srsp.setShard(shard);
-    SimpleSolrResponse ssr = new SimpleSolrResponse();
-    srsp.setSolrResponse(ssr);
-    long startTime = System.nanoTime();
-
-    try {
-      params.remove(CommonParams.WT); // use default (currently javabin)
-      params.remove(CommonParams.VERSION);
-
-      QueryRequest req = makeQueryRequest(sreq, params, shard);
-      if (tracer != null && span != null) {
-        tracer.inject(span.context(), Format.Builtin.HTTP_HEADERS, new SolrRequestCarrier(req));
-      }
-      req.setMethod(SolrRequest.METHOD.POST);
-      SolrRequestInfo requestInfo = SolrRequestInfo.getRequestInfo();
-      if (requestInfo != null) req.setUserPrincipal(requestInfo.getReq().getUserPrincipal());
-
-      if (sreq.purpose == PURPOSE_GET_FIELDS) {
-        req.setResponseParser(READ_STR_AS_CHARSEQ_PARSER);
-      }
-      // no need to set the response parser as binary is the default
-      // req.setResponseParser(new BinaryResponseParser());
-
-      // if there are no shards available for a slice, urls.size()==0
-      if (urls.size()==0) {
-        // TODO: what's the right error code here? We should use the same thing when
-        // all of the servers for a shard are down.
-        throw new SolrException(SolrException.ErrorCode.SERVICE_UNAVAILABLE, "no servers hosting shard: " + shard);
-      }
-
-      if (urls.size() <= 1) {
-        String url = urls.get(0);
-        srsp.setShardAddress(url);
-        ssr.nl = request(url, req);
-      } else {
-        LBSolrClient.Rsp rsp = httpShardHandlerFactory.makeLoadBalancedRequest(req, urls);
-        ssr.nl = rsp.getResponse();
-        srsp.setShardAddress(rsp.getServer());
-      }
-    }
-    catch( ConnectException cex ) {
-      srsp.setException(cex); //????
-    } catch (Exception th) {
-      srsp.setException(th);
-      if (th instanceof SolrException) {
-        srsp.setResponseCode(((SolrException)th).code());
-      } else {
-        srsp.setResponseCode(-1);
-      }
-    }
-
-    ssr.elapsedTime = TimeUnit.MILLISECONDS.convert(System.nanoTime() - startTime, TimeUnit.NANOSECONDS);
-
-    return srsp;
-  }
-
-  protected NamedList<Object> request(String url, SolrRequest req) throws IOException, SolrServerException {
+  /*protected NamedList<Object> request(String url, SolrRequest req) throws IOException, SolrServerException {
     req.setBasePath(url);
     return httpClient.request(req);
-  }
+  }*/
   
   /**
    * Subclasses could modify the request based on the shard

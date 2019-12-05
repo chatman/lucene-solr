@@ -16,6 +16,8 @@
  */
 package org.apache.solr.handler.component;
 
+import static org.apache.solr.util.stats.InstrumentedHttpListenerFactory.KNOWN_METRIC_NAME_STRATEGIES;
+
 import java.io.IOException;
 import java.lang.invoke.MethodHandles;
 import java.net.MalformedURLException;
@@ -35,22 +37,18 @@ import java.util.concurrent.SynchronousQueue;
 import java.util.concurrent.TimeUnit;
 import java.util.stream.Collectors;
 
-import com.google.common.annotations.VisibleForTesting;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.http.client.HttpClient;
-import org.apache.solr.client.solrj.SolrClient;
-import org.apache.solr.client.solrj.SolrRequest;
 import org.apache.solr.client.solrj.SolrServerException;
 import org.apache.solr.client.solrj.impl.Http2SolrClient;
 import org.apache.solr.client.solrj.impl.HttpClientUtil;
-import org.apache.solr.client.solrj.impl.HttpSolrClient;
 import org.apache.solr.client.solrj.impl.LBHttp2SolrClient;
 import org.apache.solr.client.solrj.impl.LBSolrClient;
+import org.apache.solr.client.solrj.request.QueryRequest;
 import org.apache.solr.client.solrj.routing.AffinityReplicaListTransformerFactory;
 import org.apache.solr.client.solrj.routing.ReplicaListTransformer;
 import org.apache.solr.client.solrj.routing.ReplicaListTransformerFactory;
 import org.apache.solr.client.solrj.routing.RequestReplicaListTransformerGenerator;
-import org.apache.solr.client.solrj.request.QueryRequest;
 import org.apache.solr.cloud.ZkController;
 import org.apache.solr.common.SolrException;
 import org.apache.solr.common.SolrException.ErrorCode;
@@ -78,7 +76,7 @@ import org.apache.solr.util.stats.MetricUtils;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-import static org.apache.solr.util.stats.InstrumentedHttpListenerFactory.KNOWN_METRIC_NAME_STRATEGIES;
+import com.google.common.annotations.VisibleForTesting;
 
 public class HttpShardHandlerFactory extends ShardHandlerFactory implements org.apache.solr.util.plugin.PluginInfoInitialized, SolrMetricProducer {
   private static final Logger log = LoggerFactory.getLogger(MethodHandles.lookup().lookupClass());
@@ -161,6 +159,10 @@ public class HttpShardHandlerFactory extends ShardHandlerFactory implements org.
     return getShardHandler(defaultClient);
   }
 
+  public LBHttp2SolrClient getLoadBalancer() {
+    return loadbalancer;
+  }
+
   /**
    * Get {@link ShardHandler} that uses custom http client.
    */
@@ -170,15 +172,7 @@ public class HttpShardHandlerFactory extends ShardHandlerFactory implements org.
 
   @Deprecated
   public ShardHandler getShardHandler(final HttpClient httpClient) {
-    // a little hack for backward-compatibility when we are moving from apache http client to jetty client
-    return new HttpShardHandler(this, null) {
-      @Override
-      protected NamedList<Object> request(String url, SolrRequest req) throws IOException, SolrServerException {
-        try (SolrClient client = new HttpSolrClient.Builder(url).withHttpClient(httpClient).build()) {
-          return client.request(req);
-        }
-      }
-    };
+    return new HttpShardHandler(this, httpClient);
   }
 
   /**
