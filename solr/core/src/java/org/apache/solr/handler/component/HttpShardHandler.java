@@ -35,7 +35,6 @@ import org.apache.http.client.HttpClient;
 import org.apache.solr.client.solrj.SolrResponse;
 import org.apache.solr.client.solrj.cloud.SolrRequestInvoker;
 import org.apache.solr.client.solrj.impl.Http2SolrClient;
-import org.apache.solr.client.solrj.request.QueryRequest;
 import org.apache.solr.client.solrj.routing.ReplicaListTransformer;
 import org.apache.solr.client.solrj.util.ClientUtils;
 import org.apache.solr.cloud.CloudDescriptor;
@@ -172,20 +171,6 @@ public class HttpShardHandler extends ShardHandler {
     }
   }
 
-  /*protected NamedList<Object> request(String url, SolrRequest req) throws IOException, SolrServerException {
-    req.setBasePath(url);
-    return httpClient.request(req);
-  }*/
-  
-  /**
-   * Subclasses could modify the request based on the shard
-   */
-  protected QueryRequest makeQueryRequest(final ShardRequest sreq, ModifiableSolrParams params, String shard)
-  {
-    // use generic request to avoid extra processing of queries
-    return new QueryRequest(params);
-  }
-  
   /** returns a ShardResponse of the last response correlated with a ShardRequest.  This won't 
    * return early if it runs into an error.  
    **/

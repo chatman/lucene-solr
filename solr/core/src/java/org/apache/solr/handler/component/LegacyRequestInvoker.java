@@ -18,13 +18,16 @@ package org.apache.solr.handler.component;
 
 import static org.apache.solr.handler.component.ShardRequest.PURPOSE_GET_FIELDS;
 
+import java.io.IOException;
 import java.net.ConnectException;
 import java.util.List;
+import java.util.Set;
 import java.util.concurrent.TimeUnit;
 
 import org.apache.http.client.HttpClient;
 import org.apache.solr.client.solrj.SolrClient;
 import org.apache.solr.client.solrj.SolrRequest;
+import org.apache.solr.client.solrj.SolrServerException;
 import org.apache.solr.client.solrj.cloud.SolrRequestInvoker;
 import org.apache.solr.client.solrj.impl.BinaryResponseParser;
 import org.apache.solr.client.solrj.impl.Http2SolrClient;
@@ -34,10 +37,11 @@ import org.apache.solr.client.solrj.impl.LBSolrClient;
 import org.apache.solr.client.solrj.request.QueryRequest;
 import org.apache.solr.client.solrj.response.SimpleSolrResponse;
 import org.apache.solr.common.SolrException;
+import org.apache.solr.common.SolrException.ErrorCode;
 import org.apache.solr.common.params.CommonParams;
 import org.apache.solr.common.params.ModifiableSolrParams;
 import org.apache.solr.common.util.JavaBinCodec;
-import org.apache.solr.common.util.Utils;
+import org.apache.solr.common.util.NamedList;
 import org.apache.solr.request.SolrRequestInfo;
 import org.apache.solr.util.tracing.SolrRequestCarrier;
 
@@ -71,7 +75,7 @@ public class LegacyRequestInvoker implements SolrRequestInvoker {
   
   public ShardResponse request(ShardRequest sreq, final String shard, final ModifiableSolrParams params,
       final List<String> urls, final Tracer tracer, final Span span) {
-    
+
     ShardResponse srsp = new ShardResponse();
     if (sreq.nodeName != null) {
       srsp.setNodeName(sreq.nodeName);
@@ -111,13 +115,21 @@ public class LegacyRequestInvoker implements SolrRequestInvoker {
         String url = urls.get(0);
         srsp.setShardAddress(url);
         req.setBasePath(url);
-        if (http2Client == null) {
-          try (SolrClient client = new HttpSolrClient.Builder(url).withHttpClient(legacyHttpClient).build()) {
-            ssr.nl = client.request(req);
+        Request invocationRequest = new Request() {
+          @Override
+          public boolean refreshForRetry(Set<String> staleCollectionStates, Set<String> staleShardTerms) {
+            return false;
           }
-        } else {
-          ssr.nl = http2Client.request(req);;
-        }
+          @Override
+          public QueryRequest solrRequest() {
+            return req;
+          }
+          @Override
+          public List<StateAssumption> getStateAssumptions() {
+            return null;
+          }
+        };
+        ssr.nl = request(invocationRequest);
       } else {
         LBSolrClient.Rsp rsp = loadBalancerClient.request(newLBHttpSolrClientReq(req, urls));
         ssr.nl = rsp.getResponse();
@@ -149,8 +161,18 @@ public class LegacyRequestInvoker implements SolrRequestInvoker {
   }
 
   @Override
-  public void request(Request request, Utils.InputStreamConsumer responseConsumer) throws SolrException {
-    throw new UnsupportedOperationException();
+  public NamedList<Object> request(Request request) throws SolrException {
+    try {
+      if (http2Client == null) {
+        try (SolrClient client = new HttpSolrClient.Builder(request.solrRequest().getBasePath()).withHttpClient(legacyHttpClient).build()) {
+          return client.request(request.solrRequest());
+        }
+      } else {
+        return http2Client.request(request.solrRequest());
+      }
+    }  catch (IOException | SolrServerException e) {
+      throw new SolrException(ErrorCode.SERVER_ERROR, e);
+    }
   }
 
 }

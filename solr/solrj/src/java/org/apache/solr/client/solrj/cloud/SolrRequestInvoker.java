@@ -23,28 +23,24 @@ import java.util.List;
 import java.util.Set;
 
 import org.apache.solr.client.solrj.SolrRequest;
-import org.apache.solr.client.solrj.request.RequestWriter;
 import org.apache.solr.common.MapWriter;
 import org.apache.solr.common.SolrException;
-import org.apache.solr.common.params.SolrParams;
-import org.apache.solr.common.util.Utils;
+import org.apache.solr.common.util.NamedList;
 
 public interface SolrRequestInvoker {
   /**
    * Make a request to one random replica
    */
-  void request(Request request, Utils.InputStreamConsumer responseConsumer) throws SolrException;
+  NamedList<Object> request(Request request) throws SolrException;
 
   enum Type {
     QUERY, UPDATE, ADMIN, DIRECT
   }
 
   interface Request {
-    /**
-     * Solr node name
-     */
-    String node();
 
+    SolrRequest solrRequest();
+    
     /**
      * If this request is constructed based on optimistic assumptions of cached state,
      * The header is encoded as follows SOLR-STATE : [{coll1:234,shard1:7876,shard2:876},{coll2:565,shard4:8665}]
@@ -59,28 +55,6 @@ public interface SolrRequestInvoker {
      */
     List<StateAssumption> getStateAssumptions();
 
-
-    /**
-     * Full path. It could be a uri to a core or an admin
-     * if the path starts with '/api/" it is a V2 API, if it starts with '/solr/' it's a v1 API
-     */
-    String path();
-
-    /**
-     * Request params
-     */
-    SolrParams params();
-
-    /**
-     * Payload if any
-     */
-    RequestWriter.ContentWriter payload();
-
-    /**
-     * Http Method
-     */
-    SolrRequest.METHOD method();
-
     /**
      * If request is failed due to an invalid state ERR,
      * The request object will be asked to refresh itself and fetch a new node/path
@@ -92,6 +66,7 @@ public interface SolrRequestInvoker {
     boolean refreshForRetry(Set<String> staleCollectionStates, Set<String> staleShardTerms);
   }
 
+  
   /**
    * Make a request to a replica of given Collection/Shard
    */
