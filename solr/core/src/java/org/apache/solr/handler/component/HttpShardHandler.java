@@ -16,8 +16,6 @@
  */
 package org.apache.solr.handler.component;
 
-import static org.apache.solr.handler.component.ShardRequest.PURPOSE_GET_FIELDS;
-
 import java.lang.invoke.MethodHandles;
 import java.util.ArrayList;
 import java.util.Arrays;
@@ -35,13 +33,10 @@ import java.util.concurrent.TimeUnit;
 import java.util.function.Predicate;
 
 import org.apache.http.client.HttpClient;
-import org.apache.solr.client.solrj.SolrRequest;
 import org.apache.solr.client.solrj.SolrResponse;
 import org.apache.solr.client.solrj.cloud.SolrRequestInvoker;
 import org.apache.solr.client.solrj.cloud.SolrRequestInvoker.Request;
-import org.apache.solr.client.solrj.cloud.SolrRequestInvoker.StateAssumption;
 import org.apache.solr.client.solrj.impl.Http2SolrClient;
-import org.apache.solr.client.solrj.request.QueryRequest;
 import org.apache.solr.client.solrj.routing.ReplicaListTransformer;
 import org.apache.solr.client.solrj.util.ClientUtils;
 import org.apache.solr.cloud.CloudDescriptor;
@@ -53,7 +48,6 @@ import org.apache.solr.common.cloud.DocCollection;
 import org.apache.solr.common.cloud.Replica;
 import org.apache.solr.common.cloud.Slice;
 import org.apache.solr.common.cloud.ZkCoreNodeProps;
-import org.apache.solr.common.params.CommonParams;
 import org.apache.solr.common.params.ModifiableSolrParams;
 import org.apache.solr.common.params.ShardParams;
 import org.apache.solr.common.params.SolrParams;
@@ -61,16 +55,13 @@ import org.apache.solr.common.util.NamedList;
 import org.apache.solr.common.util.StrUtils;
 import org.apache.solr.core.CoreDescriptor;
 import org.apache.solr.request.SolrQueryRequest;
-import org.apache.solr.request.SolrRequestInfo;
 import org.apache.solr.util.tracing.GlobalTracer;
-import org.apache.solr.util.tracing.SolrRequestCarrier;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.slf4j.MDC;
 
 import io.opentracing.Span;
 import io.opentracing.Tracer;
-import io.opentracing.propagation.Format;
 
 public class HttpShardHandler extends ShardHandler {
   
@@ -160,8 +151,7 @@ public class HttpShardHandler extends ShardHandler {
     final Tracer tracer = GlobalTracer.getTracer();
     final Span span = tracer != null? tracer.activeSpan() : null;
 
-    SolrRequestInvoker requestInvoker = new LegacyRequestInvoker(http2Client, legacyClient, httpShardHandlerFactory.getLoadBalancer(), 
-        httpShardHandlerFactory.permittedLoadBalancerRequestsMinimumAbsolute, httpShardHandlerFactory.permittedLoadBalancerRequestsMaximumFraction);
+    SolrRequestInvoker requestInvoker = new LegacyRequestInvoker(http2Client, legacyClient);
 
     Callable<ShardResponse> task = () -> {
       SimpleSolrResponse ssr = new SimpleSolrResponse();
@@ -169,7 +159,7 @@ public class HttpShardHandler extends ShardHandler {
 
       long startTime = System.nanoTime();
       try {
-        Request invocationRequest = getInvocationRequest(sreq, shard, params, urls, tracer, span);
+        Request invocationRequest = ((LegacyRequestInvoker)requestInvoker).getInvocationRequest(sreq, shard, params, urls, tracer, span);
         ssr.nl = requestInvoker.request(invocationRequest);
         srsp.setShardAddress(invocationRequest.solrRequest().getBasePath());
       } catch (Exception th) {
@@ -198,52 +188,6 @@ public class HttpShardHandler extends ShardHandler {
       MDC.remove("ShardRequest.shards");
       MDC.remove("ShardRequest.urlList");
     }
-  }
-
-  private Request getInvocationRequest(final ShardRequest sreq, final String shard, final ModifiableSolrParams params,
-      final List<String> urls, final Tracer tracer, final Span span) {
-    params.remove(CommonParams.WT); // use default (currently javabin)
-    params.remove(CommonParams.VERSION);
-
-    QueryRequest req = new QueryRequest(params);
-    if (tracer != null && span != null) {
-      tracer.inject(span.context(), Format.Builtin.HTTP_HEADERS, new SolrRequestCarrier(req));
-    }
-    req.setMethod(SolrRequest.METHOD.POST);
-    SolrRequestInfo requestInfo = SolrRequestInfo.getRequestInfo();
-    if (requestInfo != null) req.setUserPrincipal(requestInfo.getReq().getUserPrincipal());
-
-    if (sreq.purpose == PURPOSE_GET_FIELDS) {
-      req.setResponseParser(LegacyRequestInvoker.READ_STR_AS_CHARSEQ_PARSER);
-    }
-    // no need to set the response parser as binary is the default
-    // req.setResponseParser(new BinaryResponseParser());
-
-    // if there are no shards available for a slice, urls.size()==0
-    if (urls.size()==0) {
-      // TODO: what's the right error code here? We should use the same thing when
-      // all of the servers for a shard are down.
-      throw new SolrException(SolrException.ErrorCode.SERVICE_UNAVAILABLE, "no servers hosting shard: " + shard);
-    }
-
-    String url = urls.get(0);
-    //srsp.setShardAddress(url);
-    req.setBasePath(url);
-    Request invocationRequest = new Request() {
-      @Override
-      public boolean refreshForRetry(Set<String> staleCollectionStates, Set<String> staleShardTerms) {
-        return false;
-      }
-      @Override
-      public QueryRequest solrRequest() {
-        return req;
-      }
-      @Override
-      public List<StateAssumption> getStateAssumptions() {
-        return null;
-      }
-    };
-    return invocationRequest;
   }
 
   /** returns a ShardResponse of the last response correlated with a ShardRequest.  This won't 
@@ -303,7 +247,7 @@ public class HttpShardHandler extends ShardHandler {
     final SolrQueryRequest req = rb.req;
     final SolrParams params = req.getParams();
     final String shards = params.get(ShardParams.SHARDS);
-
+    
     // since the cost of grabbing cloud state is still up in the air, we grab it only
     // if we need it.
     ClusterState clusterState = null;
@@ -328,6 +272,8 @@ public class HttpShardHandler extends ShardHandler {
       if (shortCircuit) {
         return;
       }
+      System.out.println("Prep Slices: "+slices);
+      System.out.println("Prep Shards: "+shards);
     } else {
       // Standalone mode
       // In standalone mode, we need host whitelist checking
@@ -346,6 +292,11 @@ public class HttpShardHandler extends ShardHandler {
         hostChecker = httpShardHandlerFactory.getWhitelistHostChecker();
         hostChecker.checkWhitelist(shards, new ArrayList<>(Arrays.asList(shards.split("[,|]"))));
       }
+      
+      System.out.println("Prep shards param: "+shards);
+      System.out.println("Prep standalone Slices: "+Arrays.toString(rb.slices));
+      System.out.println("Prep standalone Shards: "+Arrays.toString(rb.shards));
+
     }
 
     String shards_rows = params.get(ShardParams.SHARDS_ROWS);
