@@ -42,19 +42,13 @@ public class LegacyRequestInvoker implements SolrRequestInvoker {
   final private int permittedLoadBalancerRequestsMinimumAbsolute;
   final private float permittedLoadBalancerRequestsMaximumFraction;
   
-  final List<String> urls;
-  
   public LegacyRequestInvoker(Http2SolrClient client, HttpClient legacyHttpClient,
-      LBHttp2SolrClient loadBalancer, int permittedLoadBalancerRequestsMinimumAbsolute, float permittedLoadBalancerRequestsMaximumFraction,
-      List<String> urls) {
+      LBHttp2SolrClient loadBalancer, int permittedLoadBalancerRequestsMinimumAbsolute, float permittedLoadBalancerRequestsMaximumFraction) {
     this.http2Client = client;
     this.legacyHttpClient = legacyHttpClient;
     this.loadBalancerClient = loadBalancer;
     this.permittedLoadBalancerRequestsMinimumAbsolute = permittedLoadBalancerRequestsMinimumAbsolute;
     this.permittedLoadBalancerRequestsMaximumFraction = permittedLoadBalancerRequestsMaximumFraction;
-    this.urls = urls;
-    
-    System.out.println("URLs: "+urls);
   }
   
   static final BinaryResponseParser READ_STR_AS_CHARSEQ_PARSER = new BinaryResponseParser() {
@@ -63,87 +57,6 @@ public class LegacyRequestInvoker implements SolrRequestInvoker {
       return new JavaBinCodec(null, stringCache).setReadStringAsCharSeq(true);
     }
   };
-  
-//  public ShardResponse request(ShardRequest sreq, final String shard, final ModifiableSolrParams params,
-//      final Tracer tracer, final Span span) {
-
-//    System.out.println("Shard: "+shard);
-//
-//    ShardResponse srsp = new ShardResponse();
-//    if (sreq.nodeName != null) {
-//      srsp.setNodeName(sreq.nodeName);
-//    }
-//    srsp.setShardRequest(sreq);
-//    srsp.setShard(shard);
-//    SimpleSolrResponse ssr = new SimpleSolrResponse();
-//    srsp.setSolrResponse(ssr);
-//    long startTime = System.nanoTime();
-//
-//    try {
-//      params.remove(CommonParams.WT); // use default (currently javabin)
-//      params.remove(CommonParams.VERSION);
-//
-//      QueryRequest req = new QueryRequest(params);
-//      if (tracer != null && span != null) {
-//        tracer.inject(span.context(), Format.Builtin.HTTP_HEADERS, new SolrRequestCarrier(req));
-//      }
-//      req.setMethod(SolrRequest.METHOD.POST);
-//      SolrRequestInfo requestInfo = SolrRequestInfo.getRequestInfo();
-//      if (requestInfo != null) req.setUserPrincipal(requestInfo.getReq().getUserPrincipal());
-//
-//      if (sreq.purpose == PURPOSE_GET_FIELDS) {
-//        req.setResponseParser(READ_STR_AS_CHARSEQ_PARSER);
-//      }
-//      // no need to set the response parser as binary is the default
-//      // req.setResponseParser(new BinaryResponseParser());
-//
-//      // if there are no shards available for a slice, urls.size()==0
-//      if (urls.size()==0) {
-//        // TODO: what's the right error code here? We should use the same thing when
-//        // all of the servers for a shard are down.
-//        throw new SolrException(SolrException.ErrorCode.SERVICE_UNAVAILABLE, "no servers hosting shard: " + shard);
-//      }
-//
-//      if (urls.size() <= 1) {
-//        String url = urls.get(0);
-//        srsp.setShardAddress(url);
-//        req.setBasePath(url);
-//        Request invocationRequest = new Request() {
-//          @Override
-//          public boolean refreshForRetry(Set<String> staleCollectionStates, Set<String> staleShardTerms) {
-//            return false;
-//          }
-//          @Override
-//          public QueryRequest solrRequest() {
-//            return req;
-//          }
-//          @Override
-//          public List<StateAssumption> getStateAssumptions() {
-//            return null;
-//          }
-//        };
-//        ssr.nl = request(invocationRequest);
-//      } else {
-//        LBSolrClient.Rsp rsp = loadBalancerClient.request(newLBHttpSolrClientReq(req, urls));
-//        ssr.nl = rsp.getResponse();
-//        srsp.setShardAddress(rsp.getServer());
-//      }
-//    }
-//    catch( ConnectException cex ) {
-//      srsp.setException(cex); //????
-//    } catch (Exception th) {
-//      srsp.setException(th);
-//      if (th instanceof SolrException) {
-//        srsp.setResponseCode(((SolrException)th).code());
-//      } else {
-//        srsp.setResponseCode(-1);
-//      }
-//    }
-//
-//    ssr.elapsedTime = TimeUnit.MILLISECONDS.convert(System.nanoTime() - startTime, TimeUnit.NANOSECONDS);
-//
-//    return srsp;
-//  }
   
   protected LBSolrClient.Req newLBHttpSolrClientReq(final QueryRequest req, List<String> urls) {
     int numServersToTry = (int)Math.floor(urls.size() * permittedLoadBalancerRequestsMaximumFraction);
