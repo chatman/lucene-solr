@@ -113,7 +113,7 @@ public class HttpShardHandler extends ShardHandler {
     shardToURLs = new HashMap<>();    
   }
 
-  private static class SimpleSolrResponse extends SolrResponse {
+  public static class SimpleSolrResponse extends SolrResponse {
 
     long elapsedTime;
 
@@ -164,19 +164,14 @@ public class HttpShardHandler extends ShardHandler {
         httpShardHandlerFactory.permittedLoadBalancerRequestsMinimumAbsolute, httpShardHandlerFactory.permittedLoadBalancerRequestsMaximumFraction);
 
     Callable<ShardResponse> task = () -> {
-      ShardResponse srsp = new ShardResponse();
-      if (sreq.nodeName != null) {
-        srsp.setNodeName(sreq.nodeName);
-      }
-      srsp.setShardRequest(sreq);
-      srsp.setShard(shard);
       SimpleSolrResponse ssr = new SimpleSolrResponse();
-      srsp.setSolrResponse(ssr);
-      long startTime = System.nanoTime();
+      ShardResponse srsp = ((LegacyRequestInvoker)requestInvoker).wrapSimpleResponseToShardResponse(sreq, shard, ssr);
 
+      long startTime = System.nanoTime();
       try {
-        Request invocationRequest = getInvocationRequest(sreq, shard, params, urls, tracer, span, srsp);
-        ssr.nl = ((LegacyRequestInvoker)requestInvoker).request(invocationRequest);
+        Request invocationRequest = getInvocationRequest(sreq, shard, params, urls, tracer, span);
+        ssr.nl = requestInvoker.request(invocationRequest);
+        srsp.setShardAddress(invocationRequest.solrRequest().getBasePath());
       } catch (Exception th) {
         srsp.setException(th);
         if (th instanceof SolrException) {
@@ -206,7 +201,7 @@ public class HttpShardHandler extends ShardHandler {
   }
 
   private Request getInvocationRequest(final ShardRequest sreq, final String shard, final ModifiableSolrParams params,
-      final List<String> urls, final Tracer tracer, final Span span, ShardResponse srsp) {
+      final List<String> urls, final Tracer tracer, final Span span) {
     params.remove(CommonParams.WT); // use default (currently javabin)
     params.remove(CommonParams.VERSION);
 
@@ -232,7 +227,7 @@ public class HttpShardHandler extends ShardHandler {
     }
 
     String url = urls.get(0);
-    srsp.setShardAddress(url);
+    //srsp.setShardAddress(url);
     req.setBasePath(url);
     Request invocationRequest = new Request() {
       @Override

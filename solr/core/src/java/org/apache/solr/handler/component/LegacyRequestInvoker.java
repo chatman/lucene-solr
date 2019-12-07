@@ -80,5 +80,19 @@ public class LegacyRequestInvoker implements SolrRequestInvoker {
       throw new SolrException(ErrorCode.SERVER_ERROR, e);
     }
   }
+  
+  public ShardResponse wrapSimpleResponseToShardResponse(final ShardRequest sreq, final String shard,
+      HttpShardHandler.SimpleSolrResponse ssr) {
+    ShardResponse srsp = new ShardResponse();
+    if (sreq.nodeName != null) {
+      srsp.setNodeName(sreq.nodeName);
+    }
+    srsp.setShardRequest(sreq);
+    srsp.setShard(shard);
+    srsp.setSolrResponse(ssr);
+    
+    return srsp;
+  }
+
 
 }
