@@ -31,6 +31,7 @@ import org.apache.solr.client.solrj.impl.BinaryResponseParser;
 import org.apache.solr.client.solrj.impl.Http2SolrClient;
 import org.apache.solr.client.solrj.impl.HttpSolrClient;
 import org.apache.solr.client.solrj.request.QueryRequest;
+import org.apache.solr.client.solrj.response.SimpleSolrResponse;
 import org.apache.solr.common.SolrException;
 import org.apache.solr.common.SolrException.ErrorCode;
 import org.apache.solr.common.params.CommonParams;
@@ -78,7 +79,7 @@ public class LegacyRequestInvoker implements SolrRequestInvoker {
   }
   
   public ShardResponse wrapSimpleResponseToShardResponse(final ShardRequest sreq, final String shard,
-      HttpShardHandler.SimpleSolrResponse ssr) {
+      SimpleSolrResponse ssr) {
     ShardResponse srsp = new ShardResponse();
     if (sreq.nodeName != null) {
       srsp.setNodeName(sreq.nodeName);

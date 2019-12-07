@@ -33,10 +33,10 @@ import java.util.concurrent.TimeUnit;
 import java.util.function.Predicate;
 
 import org.apache.http.client.HttpClient;
-import org.apache.solr.client.solrj.SolrResponse;
 import org.apache.solr.client.solrj.cloud.SolrRequestInvoker;
 import org.apache.solr.client.solrj.cloud.SolrRequestInvoker.Request;
 import org.apache.solr.client.solrj.impl.Http2SolrClient;
+import org.apache.solr.client.solrj.response.SimpleSolrResponse;
 import org.apache.solr.client.solrj.routing.ReplicaListTransformer;
 import org.apache.solr.client.solrj.util.ClientUtils;
 import org.apache.solr.cloud.CloudDescriptor;
@@ -51,7 +51,6 @@ import org.apache.solr.common.cloud.ZkCoreNodeProps;
 import org.apache.solr.common.params.ModifiableSolrParams;
 import org.apache.solr.common.params.ShardParams;
 import org.apache.solr.common.params.SolrParams;
-import org.apache.solr.common.util.NamedList;
 import org.apache.solr.common.util.StrUtils;
 import org.apache.solr.core.CoreDescriptor;
 import org.apache.solr.request.SolrQueryRequest;
@@ -103,34 +102,6 @@ public class HttpShardHandler extends ShardHandler {
     // so that we use the same replica for all phases of a distributed request.
     shardToURLs = new HashMap<>();    
   }
-
-  public static class SimpleSolrResponse extends SolrResponse {
-
-    long elapsedTime;
-
-    NamedList<Object> nl;
-
-    @Override
-    public long getElapsedTime() {
-      return elapsedTime;
-    }
-
-    @Override
-    public NamedList<Object> getResponse() {
-      return nl;
-    }
-
-    @Override
-    public void setResponse(NamedList<Object> rsp) {
-      nl = rsp;
-    }
-
-    @Override
-    public void setElapsedTime(long elapsedTime) {
-      this.elapsedTime = elapsedTime;
-    }
-  }
-
 
   // Not thread safe... don't use in Callable.
   // Don't modify the returned URL list.
