@@ -133,10 +133,11 @@ public class HttpShardHandler extends ShardHandler {
         Request invocationRequest = ((LegacyRequestInvoker)requestInvoker).getInvocationRequest(sreq, shard, params, urls, tracer, span);
         ssr.nl = requestInvoker.request(invocationRequest);
         srsp.setShardAddress(invocationRequest.solrRequest().getBasePath());
-      } catch (Exception th) {
-        srsp.setException(th);
-        if (th instanceof SolrException) {
-          srsp.setResponseCode(((SolrException)th).code());
+      } catch (SolrException th) {
+        Throwable ex = th.getCause();
+        srsp.setException(ex);
+        if (ex instanceof SolrException) {
+          srsp.setResponseCode(((SolrException)ex).code());
         } else {
           srsp.setResponseCode(-1);
         }
