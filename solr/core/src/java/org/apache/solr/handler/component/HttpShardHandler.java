@@ -122,7 +122,8 @@ public class HttpShardHandler extends ShardHandler {
     final Tracer tracer = GlobalTracer.getTracer();
     final Span span = tracer != null? tracer.activeSpan() : null;
 
-    SolrRequestInvoker requestInvoker = new LegacyRequestInvoker(http2Client, legacyClient);
+    SolrRequestInvoker requestInvoker = new LegacyRequestInvoker(http2Client, legacyClient, urls, httpShardHandlerFactory.getLoadBalancer(),
+        httpShardHandlerFactory.permittedLoadBalancerRequestsMinimumAbsolute, httpShardHandlerFactory.permittedLoadBalancerRequestsMaximumFraction);
 
     Callable<ShardResponse> task = () -> {
       SimpleSolrResponse ssr = new SimpleSolrResponse();

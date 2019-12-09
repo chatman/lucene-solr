@@ -30,6 +30,8 @@ import org.apache.solr.client.solrj.cloud.SolrRequestInvoker;
 import org.apache.solr.client.solrj.impl.BinaryResponseParser;
 import org.apache.solr.client.solrj.impl.Http2SolrClient;
 import org.apache.solr.client.solrj.impl.HttpSolrClient;
+import org.apache.solr.client.solrj.impl.LBHttp2SolrClient;
+import org.apache.solr.client.solrj.impl.LBSolrClient;
 import org.apache.solr.client.solrj.request.QueryRequest;
 import org.apache.solr.client.solrj.response.SimpleSolrResponse;
 import org.apache.solr.common.SolrException;
@@ -49,12 +51,22 @@ public class LegacyRequestInvoker implements SolrRequestInvoker {
 
   final private Http2SolrClient http2Client;
   final private HttpClient legacyHttpClient;
-  
-  public LegacyRequestInvoker(Http2SolrClient client, HttpClient legacyHttpClient) {
+  final List<String> urls;
+
+  final private LBHttp2SolrClient loadbalancer;
+  final int permittedLoadBalancerRequestsMinimumAbsolute;
+  final float permittedLoadBalancerRequestsMaximumFraction;
+
+  public LegacyRequestInvoker(Http2SolrClient client, HttpClient legacyHttpClient, List<String> urls,
+      LBHttp2SolrClient loadBalancer, int permittedLoadBalancerRequestsMinimumAbsolute, float permittedLoadBalancerRequestsMaximumFraction) {
     this.http2Client = client;
     this.legacyHttpClient = legacyHttpClient;
+    this.urls = urls;
+    this.loadbalancer = loadBalancer;
+    this.permittedLoadBalancerRequestsMaximumFraction = permittedLoadBalancerRequestsMaximumFraction;
+    this.permittedLoadBalancerRequestsMinimumAbsolute = permittedLoadBalancerRequestsMinimumAbsolute;
   }
-  
+
   static final BinaryResponseParser READ_STR_AS_CHARSEQ_PARSER = new BinaryResponseParser() {
     @Override
     protected JavaBinCodec createCodec() {
@@ -66,13 +78,22 @@ public class LegacyRequestInvoker implements SolrRequestInvoker {
   public NamedList<Object> request(Request request) throws SolrException {
     System.out.println("Trying to invoke: "+request.solrRequest().getBasePath());
     try {
-      if (http2Client == null) {
+      if (urls.size() > 1) {
+        //request.solrRequest().setBasePath(null);
+        int numServersToTry = (int)Math.floor(urls.size() * this.permittedLoadBalancerRequestsMaximumFraction);
+        if (numServersToTry < this.permittedLoadBalancerRequestsMinimumAbsolute) {
+          numServersToTry = this.permittedLoadBalancerRequestsMinimumAbsolute;
+        }
+        LBSolrClient.Rsp rsp = loadbalancer.request(new LBSolrClient.Req(request.solrRequest(), urls, numServersToTry));
+        request.solrRequest().setBasePath(rsp.getServer());
+        return rsp.getResponse();
+      } else if (http2Client != null) {
+        return http2Client.request(request.solrRequest());
+      } else {
         try (SolrClient client = new HttpSolrClient.Builder(request.solrRequest().getBasePath()).withHttpClient(legacyHttpClient).build()) {
           return client.request(request.solrRequest());
         }
-      } else {
-        return http2Client.request(request.solrRequest());
-      }
+      } 
     }  catch (IOException | SolrServerException e) {
       throw new SolrException(ErrorCode.SERVER_ERROR, e);
     }
@@ -120,7 +141,10 @@ public class LegacyRequestInvoker implements SolrRequestInvoker {
 
     String url = urls.get(urls.size()-1);
     System.out.println("From "+urls+", picking "+url);
-    req.setBasePath(url);
+    
+    if (urls.size() == 1) {
+      req.setBasePath(url);
+    }
     Request invocationRequest = new Request() {
       @Override
       public boolean refreshForRetry(Set<String> staleCollectionStates, Set<String> staleShardTerms) {
