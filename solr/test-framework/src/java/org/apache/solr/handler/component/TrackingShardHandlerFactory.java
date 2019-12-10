@@ -16,7 +16,6 @@
  */
 package org.apache.solr.handler.component;
 
-import java.io.IOException;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.LinkedList;
@@ -26,12 +25,8 @@ import java.util.Queue;
 import java.util.concurrent.ConcurrentHashMap;
 
 import org.apache.http.client.HttpClient;
-import org.apache.solr.client.solrj.SolrClient;
-import org.apache.solr.client.solrj.SolrRequest;
-import org.apache.solr.client.solrj.SolrServerException;
 import org.apache.solr.client.solrj.embedded.JettySolrRunner;
 import org.apache.solr.client.solrj.impl.Http2SolrClient;
-import org.apache.solr.client.solrj.impl.HttpSolrClient;
 import org.apache.solr.cloud.MiniSolrCloudCluster;
 import org.apache.solr.common.cloud.DocCollection;
 import org.apache.solr.common.cloud.Replica;
@@ -39,7 +34,6 @@ import org.apache.solr.common.cloud.Slice;
 import org.apache.solr.common.cloud.ZkCoreNodeProps;
 import org.apache.solr.common.cloud.ZkStateReader;
 import org.apache.solr.common.params.ModifiableSolrParams;
-import org.apache.solr.common.util.NamedList;
 import org.apache.solr.common.util.StrUtils;
 import org.apache.solr.core.CoreContainer;
 
@@ -139,7 +133,7 @@ public class TrackingShardHandlerFactory extends HttpShardHandlerFactory {
   public ShardHandler getShardHandler(HttpClient httpClient) {
     final ShardHandlerFactory factory = this;
     final ShardHandler wrapped = super.getShardHandler(httpClient);
-    return new HttpShardHandler(this, null) {
+    return new HttpShardHandler(this, httpClient) {
       @Override
       public void prepDistributed(ResponseBuilder rb) {
         wrapped.prepDistributed(rb);
@@ -153,13 +147,6 @@ public class TrackingShardHandlerFactory extends HttpShardHandlerFactory {
           }
         }
         wrapped.submit(sreq, shard, params);
-      }
-
-      @Override
-      protected NamedList<Object> request(String url, SolrRequest req) throws IOException, SolrServerException {
-        try (SolrClient client = new HttpSolrClient.Builder(url).withHttpClient(httpClient).build()) {
-          return client.request(req);
-        }
       }
 
       @Override

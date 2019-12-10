@@ -20,6 +20,7 @@ import java.io.PrintWriter;
 import java.io.StringWriter;
 import java.lang.invoke.MethodHandles;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.HashSet;
 import java.util.LinkedList;
 import java.util.List;
@@ -384,6 +385,7 @@ public class SearchHandler extends RequestHandlerBase implements SolrCoreAware, 
           // submit all current request tasks at once
           while (rb.outgoing.size() > 0) {
             ShardRequest sreq = rb.outgoing.remove(0);
+            System.out.println("Shards in this request: "+Arrays.toString(sreq.shards));
             sreq.actualShards = sreq.shards;
             if (sreq.actualShards==ShardRequest.ALL_SHARDS) {
               sreq.actualShards = rb.shards;
@@ -491,7 +493,7 @@ public class SearchHandler extends RequestHandlerBase implements SolrCoreAware, 
       
       int pos = rb.shortCircuitedURL.indexOf("://");        
       String shardInfoName = pos != -1 ? rb.shortCircuitedURL.substring(pos+3) : rb.shortCircuitedURL;
-      shardInfo.add(shardInfoName, nl);   
+      shardInfo.add(shardInfoName, nl);
       rsp.getValues().add(ShardParams.SHARDS_INFO,shardInfo);            
     }
   }
