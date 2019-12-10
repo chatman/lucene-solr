@@ -71,22 +71,22 @@ public final class ShardResponse {
     this.rsp = rsp;
   }
 
-  void setShard(String shard)
+  public void setShard(String shard)
   {
     this.shard = shard;
   }
 
-  void setException(Throwable exception)
+  public void setException(Throwable exception)
   {
     this.exception = exception;
   }
 
-  void setResponseCode(int rspCode)
+  public void setResponseCode(int rspCode)
   {
     this.rspCode = rspCode;
   }
   
-  void setNodeName(String nodeName) 
+  public void setNodeName(String nodeName) 
   {
     this.nodeName = nodeName;
   }
@@ -94,6 +94,6 @@ public final class ShardResponse {
   /** What was the shard address that returned this response.  Example:  "http://localhost:8983/solr" */
   public String getShardAddress() { return this.shardAddress; }
 
-  void setShardAddress(String addr) { this.shardAddress = addr; }
+  public void setShardAddress(String addr) { this.shardAddress = addr; }
 
 }
