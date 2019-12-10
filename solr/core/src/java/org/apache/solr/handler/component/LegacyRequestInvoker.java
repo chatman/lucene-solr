@@ -18,14 +18,12 @@ package org.apache.solr.handler.component;
 
 import static org.apache.solr.handler.component.ShardRequest.PURPOSE_GET_FIELDS;
 
-import java.io.IOException;
 import java.util.List;
 import java.util.Set;
 
 import org.apache.http.client.HttpClient;
 import org.apache.solr.client.solrj.SolrClient;
 import org.apache.solr.client.solrj.SolrRequest;
-import org.apache.solr.client.solrj.SolrServerException;
 import org.apache.solr.client.solrj.cloud.SolrRequestInvoker;
 import org.apache.solr.client.solrj.impl.BinaryResponseParser;
 import org.apache.solr.client.solrj.impl.Http2SolrClient;
@@ -35,7 +33,6 @@ import org.apache.solr.client.solrj.impl.LBSolrClient;
 import org.apache.solr.client.solrj.request.QueryRequest;
 import org.apache.solr.client.solrj.response.SimpleSolrResponse;
 import org.apache.solr.common.SolrException;
-import org.apache.solr.common.SolrException.ErrorCode;
 import org.apache.solr.common.params.CommonParams;
 import org.apache.solr.common.params.ModifiableSolrParams;
 import org.apache.solr.common.util.JavaBinCodec;
@@ -75,9 +72,9 @@ public class LegacyRequestInvoker implements SolrRequestInvoker {
   };
   
   @Override
-  public NamedList<Object> request(Request request) throws SolrException {
+  public NamedList<Object> request(Request request) throws Exception {
     System.out.println("Trying to invoke: "+request.solrRequest().getBasePath());
-    try {
+    //try {
       if (urls.size() > 1) {
         //request.solrRequest().setBasePath(null);
         int numServersToTry = (int)Math.floor(urls.size() * this.permittedLoadBalancerRequestsMaximumFraction);
@@ -94,9 +91,9 @@ public class LegacyRequestInvoker implements SolrRequestInvoker {
           return client.request(request.solrRequest());
         }
       } 
-    }  catch (IOException | SolrServerException e) {
-      throw new SolrException(ErrorCode.SERVER_ERROR, e);
-    }
+    //}  catch (IOException | SolrServerException e) {
+      //throw new SolrException(ErrorCode.SERVER_ERROR, e);
+    //}
   }
   
   public ShardResponse wrapSimpleResponseToShardResponse(final ShardRequest sreq, final String shard,
