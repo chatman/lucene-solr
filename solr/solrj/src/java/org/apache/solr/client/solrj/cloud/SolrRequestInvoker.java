@@ -24,14 +24,13 @@ import java.util.Set;
 
 import org.apache.solr.client.solrj.SolrRequest;
 import org.apache.solr.common.MapWriter;
-import org.apache.solr.common.SolrException;
 import org.apache.solr.common.util.NamedList;
 
 public interface SolrRequestInvoker {
   /**
    * Make a request to one random replica
    */
-  NamedList<Object> request(Request request) throws SolrException;
+  NamedList<Object> request(Request request) throws Exception;
 
   enum Type {
     QUERY, UPDATE, ADMIN, DIRECT
