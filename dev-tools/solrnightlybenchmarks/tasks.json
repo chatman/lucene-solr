@@ -1,0 +1,73 @@
+{
+    "task-types": [
+        {
+            "name": "indexing-wikipedia",
+            "indexing-benchmark": {
+                "name": "wikipedia-small",
+                "description": "Wikipedia dataset on SolrCloud",
+                "dataset-file": "small-data/small-enwiki.tsv.gz",
+                "setups": [
+                  {
+                    "setup-name": "wiki_2x2",
+                    "collection": "wiki_2x2",
+                    "replication-factor": 2,
+                    "shards": 2,
+                    "min-threads": 4,
+                    "max-threads": 12,
+                    "thread-step": 4
+                  }
+                ]
+              }
+        },
+        {
+            "name": "collection-creation",
+            "command": "http://${HOST}:${PORT}/solr/collections/admin?action=CREATE&name=collection${INDEX}&numShards=${SHARDS}",
+            "defaults": {
+                "INDEX": 0,
+                "SHARDS": 1
+            }
+        },
+        {
+            "name": "shard-splitting",
+            "command": "http://${HOST}:${PORT}/solr/collections/admin?action=SPLITSHARD&collection=${COLLECTION}&shard=${SHARD}",
+            "defaults": {}
+        }
+    ],
+
+    "global-variables": {
+        "collection-counter": 1
+    },
+
+    "tasks": [
+        {
+            "task": "task1",
+            "type": "indexing-wikipedia",
+            "mode": "async"
+        },
+        {
+            "description": "Create 100 collections parallely using 4 threads",
+            "task": "task2",
+            "type": "collection-creation",
+            "instances": 100,
+            "concurrency": 4,
+            "parameters": {
+                "INDEX": "${collection-counter}"
+            },
+            "pre-task-evals": [
+                "inc(collection-counter,1)"
+            ],
+            "mode": "async"
+        },
+        {
+            "description": "Once all collections are created, split a shard in collection1",
+            "task": "task3",
+            "type": "shard-splitting",
+            "parameters": {
+                "COLLECTION": "collection1",
+                "SHARD": "shard1"
+            },
+            "waitFor": "task2",
+            "mode": "sync"
+        }
+    ]
+}
